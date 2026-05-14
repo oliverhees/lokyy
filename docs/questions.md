@@ -15,10 +15,12 @@ Lokyy soll später kommerziell angeboten werden. Die Hermes-Workspace-MIT-Lizenz
 
 ---
 
-## Visuelle Verifikation auf Linux (Q-002 — entscheiden VOR Phase A)
+## Visuelle Verifikation auf Linux (Q-002 — RESOLVED ✅)
 
-**Status:** Offen — getrackt als [Issue #22](https://github.com/oliverhees/lokyy/issues/22)
-**Trifft auf:** Issue [#14](https://github.com/oliverhees/lokyy/issues/14) (Phase A) und alle nachfolgenden Reskin-Issues
+**Status:** Geschlossen am 2026-05-14 — Oliver wählte **Option B (Playwright)** in [Issue #22](https://github.com/oliverhees/lokyy/issues/22).
+**Umsetzung:** `scripts/verify-ui.ts` (Playwright headless Chromium), Setup via `bun install` + `bunx playwright install chromium`. Workflow dokumentiert in `scripts/README.md`. Baseline-Screenshot der Pre-Reskin Hermes-Optik unter `docs/verification-shots/baseline-hermes-look.png`.
+**Override:** Lokyy/Linux-spezifischer Override der CLAUDE.md-Regel "Interceptor for ALL web verification". Als Project-Memory hinterlegt.
+**Trifft auf:** Issue [#14](https://github.com/oliverhees/lokyy/issues/14) (Phase A) und alle nachfolgenden Reskin-Issues — ab jetzt nutzen alle `bun run scripts/verify-ui.ts`.
 **Aufgetaucht in:** Issue [#3](https://github.com/oliverhees/lokyy/issues/3)
 
 CLAUDE.md (global, Oliver's PAI-Regel) schreibt vor: **„Interceptor for ALL web verification."** Aber: Interceptor CLI ist auf diesem Linux-System (Pop!_OS) nicht installiert — die Skill-Installations-Pfade sind Mac-spezifisch (`/opt/homebrew/bin/`, `~/Projects/interceptor`). Chrome läuft (PID 14304), aber die Extension + Native Messaging Bridge fehlen.
