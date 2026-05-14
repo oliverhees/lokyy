@@ -42,6 +42,35 @@ CLAUDE.md (global, Oliver's PAI-Regel) schreibt vor: **„Interceptor for ALL we
 
 ---
 
+## In-Component-UI-Strings "Hermes Workspace" (Q-003 — Etappe-2-Kandidat)
+
+**Status:** Offen, Brief-konformes Carry-Over aus Etappe 1
+**Aufgetaucht in:** Issue [#18](https://github.com/oliverhees/lokyy/issues/18) (Phase E)
+
+Phase E hatte Scope: **README.md + CONTRIBUTING + SECURITY + Bilder/Assets/Favicon/OG/manifest**. Inside-Component-JSX-Strings (z.B. "Hermes Workspace" im Chat-Empty-State, Login-Modal-Texte, Onboarding-Karte, Settings-Section-Labels) waren **nicht** im Brief-Scope von Phase E.
+
+Sichtbar im Phase-E-After-Screenshot: das Chat-Empty-State zeigt noch "HERMES WORKSPACE / Begin a session / Agent chat · live tools · memory · full observability". Ähnlich in Mobile-Komponenten, Sound-Library-Labels.
+
+**Optionen:**
+- A: Etappe 2 — eigenes Issue für "Komplett-Sweep aller sichtbaren UI-Strings"
+- B: Spätere Phase D-2 nach Etappe-1-Closeout
+- C: Pro-Komponente bei nächstem Upstream-Merge mitziehen
+
+**Empfehlung:** A (eigenes klares Etappe-2-Issue), weil Brief-Regel "Lokyy überall wo ein Mensch es sieht" sonst nicht erfüllt ist. Aktuell sichtbar-Hermes-Texte sind: chat-empty-state, login/onboarding, „Hermes Agent" als Backend-Label in Settings, einige mobile-tab-bar Labels, Skill-Marketplace-Titles.
+
+## Hermes-Marketing-Routen referenzieren gelöschte Assets (Q-004 — bewusst akzeptiert)
+
+**Status:** Bewusst akzeptiert für Etappe 1
+**Aufgetaucht in:** Issue [#18](https://github.com/oliverhees/lokyy/issues/18) (Phase E)
+
+`src/screens/hermes-world/hermes-world-landing.tsx` + `playground-screen.tsx` referenzieren Assets aus `public/assets/hermesworld/**` — die Phase E gelöscht hat. Wenn jemand die Routen direkt aufruft (`/world`, `/playground`), gibt's 404er für die Bilder.
+
+Brief-Recommendation für diese Routen war "hide" → Sidebar führt sie nicht auf, in der Lokyy-Navigation **unerreichbar**. Direct-URL bleibt theoretisch möglich. Trade-off bewusst gewählt: lieber 404er auf hidden routes als 24MB Hermes-Branding im Repo.
+
+**Empfehlung:** keine Aktion in Etappe 1. Falls in Etappe 2 die Marketing-Routen ganz entfernt werden (via routes/ delete + routeTree regenerate), ist das Problem weg. Bis dahin: hidden + 404 ist akzeptabel.
+
+---
+
 ## Weitere Fragen (werden laufend ergänzt)
 
 *Noch keine weiteren offenen Punkte.*
