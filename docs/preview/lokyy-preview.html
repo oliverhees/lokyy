@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1920,initial-scale=1" />
+  <title>lokyy — design preview</title>
+  <style>
+    /* ─────────────────────────────────────────────────────────────────
+       Lokyy Design Tokens — extracted verbatim from docs/lokyy-design.md
+       Two scopes: .panel--dark, .panel--light render side-by-side
+       so Oliver can compare both modes in one screenshot.
+       ───────────────────────────────────────────────────────────────── */
+
+    .panel--dark {
+      --background:             oklch(0.18 0.015 270);
+      --foreground:             oklch(0.96 0.005 270);
+      --card:                   oklch(0.22 0.015 270);
+      --card-foreground:        oklch(0.96 0.005 270);
+      --popover:                oklch(0.24 0.018 270);
+      --popover-foreground:     oklch(0.96 0.005 270);
+      --primary:                oklch(0.625 0.205 280);
+      --primary-foreground:     oklch(0.98 0.005 270);
+      --secondary:              oklch(0.28 0.012 270);
+      --secondary-foreground:   oklch(0.96 0.005 270);
+      --muted:                  oklch(0.25 0.012 270);
+      --muted-foreground:       oklch(0.68 0.012 270);
+      --accent:                 oklch(0.32 0.05 280);
+      --accent-foreground:      oklch(0.96 0.005 270);
+      --destructive:            oklch(0.62 0.22 27);
+      --destructive-foreground: oklch(0.98 0.005 270);
+      --border:                 oklch(0.28 0.012 270);
+      --input:                  oklch(0.24 0.012 270);
+      --ring:                   oklch(0.625 0.205 280);
+      --sidebar:                oklch(0.20 0.015 270);
+      --sidebar-foreground:     oklch(0.92 0.008 270);
+      --sidebar-primary:        oklch(0.625 0.205 280);
+      --sidebar-primary-foreground: oklch(0.98 0.005 270);
+      --sidebar-accent:         oklch(0.26 0.015 270);
+      --sidebar-accent-foreground: oklch(0.96 0.005 270);
+      --sidebar-border:         oklch(0.24 0.012 270);
+      --success:                oklch(0.70 0.16 155);
+      --warning:                oklch(0.78 0.16 75);
+      --info:                   oklch(0.70 0.13 230);
+      --logo-inner:             oklch(0.18 0.015 270);
+      --shadow-md:              0 6px 16px oklch(0 0 0 / 0.35);
+    }
+
+    .panel--light {
+      --background:             oklch(0.99 0.003 270);
+      --foreground:             oklch(0.22 0.020 270);
+      --card:                   oklch(1.00 0 0);
+      --card-foreground:        oklch(0.22 0.020 270);
+      --popover:                oklch(1.00 0 0);
+      --popover-foreground:     oklch(0.22 0.020 270);
+      --primary:                oklch(0.555 0.215 280);
+      --primary-foreground:     oklch(0.99 0.003 270);
+      --secondary:              oklch(0.95 0.010 270);
+      --secondary-foreground:   oklch(0.22 0.020 270);
+      --muted:                  oklch(0.96 0.008 270);
+      --muted-foreground:       oklch(0.50 0.015 270);
+      --accent:                 oklch(0.94 0.025 280);
+      --accent-foreground:      oklch(0.40 0.180 280);
+      --destructive:            oklch(0.55 0.23 27);
+      --destructive-foreground: oklch(0.99 0.003 270);
+      --border:                 oklch(0.92 0.008 270);
+      --input:                  oklch(1.00 0 0);
+      --ring:                   oklch(0.555 0.215 280);
+      --sidebar:                oklch(0.97 0.006 270);
+      --sidebar-foreground:     oklch(0.28 0.018 270);
+      --sidebar-primary:        oklch(0.555 0.215 280);
+      --sidebar-primary-foreground: oklch(0.99 0.003 270);
+      --sidebar-accent:         oklch(0.93 0.012 270);
+      --sidebar-accent-foreground: oklch(0.22 0.020 270);
+      --sidebar-border:         oklch(0.90 0.008 270);
+      --success:                oklch(0.58 0.15 155);
+      --warning:                oklch(0.66 0.16 75);
+      --info:                   oklch(0.58 0.13 230);
+      --logo-inner:             oklch(1.00 0 0);
+      --shadow-md:              0 6px 16px oklch(0 0 0 / 0.08);
+    }
+
+    :root {
+      --radius:    0.625rem;
+      --radius-sm: calc(var(--radius) - 4px);
+      --radius-md: var(--radius);
+      --radius-lg: calc(var(--radius) + 4px);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-feature-settings: "cv11", "ss01";
+      background: oklch(0.12 0.01 270);
+      color: white;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .meta {
+      max-width: 1920px;
+      margin: 0 auto;
+      padding: 28px 32px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      color: oklch(0.70 0.01 270);
+      font-size: 13px;
+    }
+    .meta strong { color: white; font-size: 18px; letter-spacing: -0.02em; }
+    .meta .right { font-variant-numeric: tabular-nums; }
+
+    .stage {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      max-width: 1920px;
+      margin: 0 auto;
+      padding: 12px 24px 32px;
+    }
+
+    .panel {
+      background: var(--background);
+      color: var(--foreground);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 720px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .panel__mode-tag {
+      position: absolute;
+      margin: 12px 0 0 14px;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted-foreground);
+      pointer-events: none;
+    }
+
+    /* ─── Sidebar ─────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--sidebar);
+      color: var(--sidebar-foreground);
+      border-right: 1px solid var(--sidebar-border);
+      padding: 18px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 8px 14px;
+      border-bottom: 1px solid var(--sidebar-border);
+    }
+    .brand__logo {
+      width: 28px; height: 28px;
+      color: var(--primary);
+    }
+    .brand__wordmark {
+      font-weight: 600; font-size: 17px;
+      letter-spacing: -0.02em;
+      color: var(--sidebar-foreground);
+    }
+    .brand__wordmark em {
+      font-style: normal;
+      color: var(--muted-foreground);
+      font-weight: 500;
+      font-size: 11px;
+      margin-left: 6px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .nav-section { display: flex; flex-direction: column; gap: 2px; }
+    .nav-section__head {
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted-foreground);
+      padding: 4px 10px 8px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 13.5px;
+      color: var(--sidebar-foreground);
+      cursor: default;
+    }
+    .nav-item__icon {
+      width: 16px; height: 16px;
+      flex: 0 0 16px;
+      color: var(--muted-foreground);
+    }
+    .nav-item--hover {
+      background: var(--sidebar-accent);
+      color: var(--sidebar-accent-foreground);
+    }
+    .nav-item--active {
+      background: var(--sidebar-primary);
+      color: var(--sidebar-primary-foreground);
+    }
+    .nav-item--active .nav-item__icon { color: var(--sidebar-primary-foreground); }
+
+    /* ─── Main ───────────────────────────────────────────────────── */
+    .main {
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--background);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 13px;
+      color: var(--muted-foreground);
+    }
+    .header strong { color: var(--foreground); font-weight: 500; }
+    .header .sep { color: var(--border); }
+
+    .content {
+      padding: 24px 28px;
+      display: grid;
+      gap: 20px;
+    }
+
+    h1.page-title {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+    .lede {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted-foreground);
+      max-width: 560px;
+      line-height: 1.5;
+    }
+
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+    /* ─── Buttons ────────────────────────────────────────────────── */
+    .btn {
+      font: inherit;
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      cursor: default;
+      border: 1px solid transparent;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn--primary    { background: var(--primary); color: var(--primary-foreground); }
+    .btn--secondary  { background: var(--secondary); color: var(--secondary-foreground); }
+    .btn--outline    { background: transparent; color: var(--foreground); border-color: var(--border); }
+    .btn--ghost      { background: transparent; color: var(--foreground); }
+    .btn--destructive{ background: var(--destructive); color: var(--destructive-foreground); }
+
+    /* ─── Card ────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      color: var(--card-foreground);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-md);
+    }
+    .card__title { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+    .card__desc  { margin: 0 0 16px; font-size: 13px; color: var(--muted-foreground); }
+
+    .form-grid { display: grid; gap: 12px; }
+    .field { display: grid; gap: 6px; }
+    .field label { font-size: 12.5px; color: var(--muted-foreground); }
+    .field input {
+      font: inherit; font-size: 13.5px;
+      background: var(--input);
+      color: var(--foreground);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 11px;
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+    .field input:focus { outline-color: var(--ring); }
+    .field--focused input { outline-color: var(--ring); }
+
+    /* ─── Badges & semantic ──────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px; font-weight: 500;
+    }
+    .badge--default     { background: var(--primary); color: var(--primary-foreground); }
+    .badge--secondary   { background: var(--secondary); color: var(--secondary-foreground); }
+    .badge--outline     { background: transparent; color: var(--foreground); border: 1px solid var(--border); }
+    .badge--success     { background: color-mix(in oklch, var(--success) 18%, transparent); color: var(--success); }
+    .badge--warning     { background: color-mix(in oklch, var(--warning) 20%, transparent); color: var(--warning); }
+    .badge--destructive { background: var(--destructive); color: var(--destructive-foreground); }
+
+    .alert {
+      display: flex; gap: 12px;
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: var(--accent-foreground);
+      border: 1px solid var(--border);
+    }
+    .alert__icon { color: var(--primary); flex: 0 0 18px; margin-top: 1px; }
+    .alert__title { font-weight: 600; font-size: 13.5px; margin: 0 0 2px; }
+    .alert__body  { font-size: 13px; color: var(--muted-foreground); margin: 0; }
+
+    /* ─── Swatches ──────────────────────────────────────────────── */
+    .swatch-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .sw {
+      display: grid;
+      gap: 4px;
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+    .sw__chip {
+      height: 36px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    .sw__name { font-size: 10.5px; color: var(--muted-foreground); }
+    .sw__val { font-size: 10px; color: var(--foreground); font-variant-numeric: tabular-nums; opacity: 0.7; }
+
+    /* Below-the-fold full token strip */
+    .strip {
+      max-width: 1920px;
+      margin: 0 auto 40px;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .strip section {
+      background: var(--bg-strip, oklch(0.16 0.012 270));
+      padding: 16px 18px;
+      border-radius: var(--radius-lg);
+    }
+    .strip .panel--dark { --bg-strip: oklch(0.18 0.015 270); }
+    .strip .panel--light { --bg-strip: var(--background); }
+    .strip h3 {
+      margin: 0 0 12px;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted-foreground);
+    }
+  </style>
+</head>
+<body>
+
+<div class="meta">
+  <div><strong>lokyy</strong> · design preview · etappe 1 step 3.1</div>
+  <div class="right">indigo · oklch(0.625 0.205 280) · #6E63F2 · radius 0.625rem</div>
+</div>
+
+<div class="stage">
+
+  <!-- ───── DARK PANEL ───────────────────────────────────────── -->
+  <div class="panel panel--dark" style="position:relative">
+    <span class="panel__mode-tag">dark · default</span>
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand__logo" viewBox="0 0 24 24" fill="none" aria-label="lokyy">
+          <rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/>
+          <circle cx="9" cy="9" r="2.5" fill="var(--logo-inner)"/>
+        </svg>
+        <span class="brand__wordmark">lokyy<em>workspace</em></span>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section__head">Dashboard</div>
+        <div class="nav-item nav-item--active">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Overview
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat
+        </div>
+        <div class="nav-item nav-item--hover">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Files
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Terminal
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+          Jobs
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section__head">Knowledge</div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          Memory
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          Skills
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          MCP
+        </div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header">
+        <span>workspace</span>
+        <span class="sep">/</span>
+        <span>dashboard</span>
+        <span class="sep">/</span>
+        <strong>overview</strong>
+      </header>
+
+      <div class="content">
+        <div>
+          <h1 class="page-title">Welcome back</h1>
+          <p class="lede">Your local AI workspace is running. Three jobs completed in the last hour, two skills are ready to invoke, and the conductor has one open thread waiting on input.</p>
+        </div>
+
+        <div class="row">
+          <button class="btn btn--primary">Open Chat</button>
+          <button class="btn btn--secondary">New Job</button>
+          <button class="btn btn--outline">Settings</button>
+          <button class="btn btn--ghost">Help</button>
+          <button class="btn btn--destructive">Delete</button>
+        </div>
+
+        <div class="row">
+          <span class="badge badge--default">v2.3</span>
+          <span class="badge badge--secondary">connected</span>
+          <span class="badge badge--outline">offline-first</span>
+          <span class="badge badge--success">3 healthy</span>
+          <span class="badge badge--warning">1 stalled</span>
+          <span class="badge badge--destructive">2 errors</span>
+        </div>
+
+        <div class="alert">
+          <svg class="alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div>
+            <p class="alert__title">Conductor is waiting on input</p>
+            <p class="alert__body">Thread <em>orchestrate-newsletter</em> paused 4 min ago — review the proposed steps to continue.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card__title">New Skill</h3>
+          <p class="card__desc">Register a skill the workspace can invoke from chat.</p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="d-skill-name">Skill name</label>
+              <input id="d-skill-name" type="text" value="parse-pdf-table" />
+            </div>
+            <div class="field field--focused">
+              <label for="d-skill-trigger">Trigger phrase (focused)</label>
+              <input id="d-skill-trigger" type="text" value="parse the pdf at" />
+            </div>
+            <div class="row">
+              <button class="btn btn--primary">Register</button>
+              <button class="btn btn--ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ───── LIGHT PANEL ───────────────────────────────────────── -->
+  <div class="panel panel--light" style="position:relative">
+    <span class="panel__mode-tag">light</span>
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand__logo" viewBox="0 0 24 24" fill="none" aria-label="lokyy">
+          <rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/>
+          <circle cx="9" cy="9" r="2.5" fill="var(--logo-inner)"/>
+        </svg>
+        <span class="brand__wordmark">lokyy<em>workspace</em></span>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section__head">Dashboard</div>
+        <div class="nav-item nav-item--active">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Overview
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat
+        </div>
+        <div class="nav-item nav-item--hover">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Files
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Terminal
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+          Jobs
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section__head">Knowledge</div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          Memory
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          Skills
+        </div>
+        <div class="nav-item">
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          MCP
+        </div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header">
+        <span>workspace</span>
+        <span class="sep">/</span>
+        <span>dashboard</span>
+        <span class="sep">/</span>
+        <strong>overview</strong>
+      </header>
+
+      <div class="content">
+        <div>
+          <h1 class="page-title">Welcome back</h1>
+          <p class="lede">Your local AI workspace is running. Three jobs completed in the last hour, two skills are ready to invoke, and the conductor has one open thread waiting on input.</p>
+        </div>
+
+        <div class="row">
+          <button class="btn btn--primary">Open Chat</button>
+          <button class="btn btn--secondary">New Job</button>
+          <button class="btn btn--outline">Settings</button>
+          <button class="btn btn--ghost">Help</button>
+          <button class="btn btn--destructive">Delete</button>
+        </div>
+
+        <div class="row">
+          <span class="badge badge--default">v2.3</span>
+          <span class="badge badge--secondary">connected</span>
+          <span class="badge badge--outline">offline-first</span>
+          <span class="badge badge--success">3 healthy</span>
+          <span class="badge badge--warning">1 stalled</span>
+          <span class="badge badge--destructive">2 errors</span>
+        </div>
+
+        <div class="alert">
+          <svg class="alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div>
+            <p class="alert__title">Conductor is waiting on input</p>
+            <p class="alert__body">Thread <em>orchestrate-newsletter</em> paused 4 min ago — review the proposed steps to continue.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card__title">New Skill</h3>
+          <p class="card__desc">Register a skill the workspace can invoke from chat.</p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="l-skill-name">Skill name</label>
+              <input id="l-skill-name" type="text" value="parse-pdf-table" />
+            </div>
+            <div class="field field--focused">
+              <label for="l-skill-trigger">Trigger phrase (focused)</label>
+              <input id="l-skill-trigger" type="text" value="parse the pdf at" />
+            </div>
+            <div class="row">
+              <button class="btn btn--primary">Register</button>
+              <button class="btn btn--ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ───── Token swatches (below the fold) ──────────────────────────── -->
+<div class="strip">
+  <section class="panel--dark">
+    <h3>Dark tokens · 16 surfaces</h3>
+    <div class="swatch-grid">
+      <div class="sw"><div class="sw__chip" style="background:var(--background)"></div><div class="sw__name">background</div><div class="sw__val">#0B0D14</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--sidebar)"></div><div class="sw__name">sidebar</div><div class="sw__val">#0F1119</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--card)"></div><div class="sw__name">card</div><div class="sw__val">#131521</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--popover)"></div><div class="sw__name">popover</div><div class="sw__val">#171A28</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--muted)"></div><div class="sw__name">muted</div><div class="sw__val">#181B27</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--secondary)"></div><div class="sw__name">secondary</div><div class="sw__val">#1E2130</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--accent)"></div><div class="sw__name">accent</div><div class="sw__val">#252740</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--border)"></div><div class="sw__name">border</div><div class="sw__val">#1E2130</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--primary)"></div><div class="sw__name">primary</div><div class="sw__val">#6E63F2</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--destructive)"></div><div class="sw__name">destructive</div><div class="sw__val">#E25A4D</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--success)"></div><div class="sw__name">success</div><div class="sw__val">#4FCB7C</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--warning)"></div><div class="sw__name">warning</div><div class="sw__val">#E5B547</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--info)"></div><div class="sw__name">info</div><div class="sw__val">#5CB6E0</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--foreground)"></div><div class="sw__name">foreground</div><div class="sw__val">#F2F3F7</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--muted-foreground)"></div><div class="sw__name">muted-fg</div><div class="sw__val">#9CA0AE</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--ring)"></div><div class="sw__name">ring</div><div class="sw__val">#6E63F2</div></div>
+    </div>
+  </section>
+
+  <section class="panel--light">
+    <h3 style="color:var(--muted-foreground)">Light tokens · 16 surfaces</h3>
+    <div class="swatch-grid">
+      <div class="sw"><div class="sw__chip" style="background:var(--background)"></div><div class="sw__name">background</div><div class="sw__val">#FBFBFD</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--sidebar)"></div><div class="sw__name">sidebar</div><div class="sw__val">#F4F5F9</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--card)"></div><div class="sw__name">card</div><div class="sw__val">#FFFFFF</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--popover)"></div><div class="sw__name">popover</div><div class="sw__val">#FFFFFF</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--muted)"></div><div class="sw__name">muted</div><div class="sw__val">#F1F2F7</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--secondary)"></div><div class="sw__name">secondary</div><div class="sw__val">#EEEFF5</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--accent)"></div><div class="sw__name">accent</div><div class="sw__val">#E8E6F8</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--border)"></div><div class="sw__name">border</div><div class="sw__val">#E5E6ED</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--primary)"></div><div class="sw__name">primary</div><div class="sw__val">#5848E0</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--destructive)"></div><div class="sw__name">destructive</div><div class="sw__val">#C73E32</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--success)"></div><div class="sw__name">success</div><div class="sw__val">#3A9C5E</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--warning)"></div><div class="sw__name">warning</div><div class="sw__val">#B8862D</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--info)"></div><div class="sw__name">info</div><div class="sw__val">#3A87B8</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--foreground)"></div><div class="sw__name">foreground</div><div class="sw__val">#16182A</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--muted-foreground)"></div><div class="sw__name">muted-fg</div><div class="sw__val">#6B6F7E</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--ring)"></div><div class="sw__name">ring</div><div class="sw__val">#5848E0</div></div>
+    </div>
+  </section>
+</div>
+
+</body>
+</html>
