@@ -14,12 +14,10 @@ lokyy ist das **ruhige Cockpit eines selbst-gehosteten KI-Betriebssystems**. Die
 
 - **Markenname:** **lokyy** (immer lowercase — in UI-Headern, Tab-Title, OG-Images, README-Titel, Logos).
 - **Wo Caps erlaubt sind:** ausschliesslich als typografisches Stilmittel für Section-Headings im Sidebar/Dashboard-Stil (z.B. `DASHBOARD`, `KNOWLEDGE`, `JOBS`). Das ist Layout-Typografie, nicht Branding. Die Wortmarke selbst bleibt überall lowercase.
-- **Tagline (Vorschläge — Oliver wählt eine, oder keine):**
-  1. *„your local ai operating system"* — funktional, sagt was es ist
-  2. *„the local layer"* — kürzeste Variante, abstrakter
-  3. *„ki, lokal."* — deutsch, lakonisch, passt zum Lowercase-Stil
-
-  Empfehlung: Variante 3 für DACH-Marketing, Variante 1 für Repo/OG-Image. Default in Etappe 1: **keine Tagline im UI**, nur Wordmark.
+- **Tagline (Olivers Wahl, Checkpoint #13):** **`AI OPERATING SYSTEM`** — in ALL CAPS gesetzt, als typografisches Stilmittel auf einer Linie mit den Sidebar-Section-Headings.
+  - **Wo sie erscheint:** Im Sidebar-Brand-Bereich als zweite Zeile unter dem Wordmark. Auch in Login/Splash, OG-Image, README-Header.
+  - **Stil-Spec:** `font-size: 10.5px`, `letter-spacing: 0.18em`, `text-transform: uppercase`, `color: var(--muted-foreground)` — identisch zur Sidebar-Section-Heading-Typografie, damit Brand-Mark und Section-Headings als zusammenhängendes typografisches System wirken.
+  - **In Main-UI-Header oder Top-Bar:** nicht — dort ist der Wordmark allein, sonst wird's redundant.
 
 ## Logo
 
@@ -42,7 +40,37 @@ lokyy ist das **ruhige Cockpit eines selbst-gehosteten KI-Betriebssystems**. Die
 - **16px (Favicon):** Box + Punkt klar erkennbar. Beide Formen >2px, kein Detail-Verlust. Lesbar.
 - **24px (Sidebar-Icon):** Idealgrösse. Box-Korner-Radius (~5px in 24px-viewBox) wirkt distinct, aber nicht verspielt.
 - **48px (App-Icon, Login):** Punkt-Innen tritt deutlich hervor, Wirkung „bewohnte Box".
-- **128px+ (Splash, About):** Funktioniert auch ohne Detail-Ergänzung. Falls Oliver eine Wordmark-Variante will: „lokyy" rechts vom Symbol, Inter SemiBold, mit `letter-spacing: -0.02em`, vertikal mittig zur Box.
+- **128px+ (Splash, About):** Funktioniert auch ohne Detail-Ergänzung.
+
+### Lockup-Variante (Symbol + Wordmark, Olivers Wahl in #13)
+
+Horizontale Lockup für Header, README, Login, OG-Image, Splash. Symbol links, Wordmark rechts, vertikal mittig.
+
+**SVG (124×24 viewBox):**
+
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 124 24" fill="none" aria-label="lokyy">
+  <!-- Symbol: gerundetes Quadrat = "die lokale Box" -->
+  <rect x="0" y="0" width="24" height="24" rx="5" fill="currentColor"/>
+  <!-- Innen-Punkt versetzt oben-links = "die KI im Raum" -->
+  <circle cx="7" cy="7" r="2.5" fill="var(--logo-inner, #ffffff)"/>
+  <!-- Wordmark, Inter SemiBold, vertikal optisch mittig (Baseline 17 in 24-Höhe) -->
+  <text x="34" y="17.5"
+        font-family="Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+        font-weight="600" font-size="18"
+        letter-spacing="-0.02em"
+        fill="currentColor">lokyy</text>
+</svg>
+```
+
+**Verwendung:**
+- Login/Splash: Lockup gross (256–360px breit), zentriert. Darunter optional `AI OPERATING SYSTEM` als Tagline-Caps mit 16px Abstand.
+- README-Header: Lockup ~200px breit, links-bündig.
+- OG-Image (1200×630): Lockup zentriert auf Lokyy-Dark-BG.
+- Favicon-Set: nur Symbol (ohne Wordmark). Lockup ist nicht für 16/32/48px Icon-Slots gedacht.
+- Sidebar im Workspace: weiterhin **Symbol + textuelles `<span>lokyy</span>`** (kein inline-SVG-Lockup, damit Tagline darunter auf eigener Zeile sauber sitzt — siehe Schreibweise & Wordmark oben).
+
+**Monochrome-Lockup:** Falls für Print/Wasserzeichen: Symbol + Text als zwei Helligkeitsstufen derselben Farbe.
 
 **Farbverhalten:**
 - Light Mode: Box in `var(--primary)` (Indigo), Punkt in `#ffffff`.
@@ -284,9 +312,13 @@ Wer lokyy aufmacht, sieht zuerst eine **schmale dunkle Sidebar mit Section-Headi
 
 ---
 
-## Offene Punkte für Oliver (Checkpoint #13)
+## Geklärt durch Oliver (Checkpoint #13, 2026-05-14)
 
-1. **Tagline:** Welche der drei Varianten — oder gar keine? Default-Empfehlung: keine im UI, „ki, lokal." nur für Marketing-OG.
-2. **Hermes-Theme-Whitelist:** sollen die 6 Nicht-`claude-nous`-Themes (`claude-official`, `claude-classic`, `claude-slate` × 2) später aus der Settings-UI entfernt werden? Empfehlung: in Phase D klären, nicht jetzt.
-3. **Logo-Wordmark-Variante:** möchte Oliver eine kombinierte Variante (Symbol + „lokyy" daneben) zusätzlich zum reinen Symbol? Default-Empfehlung: ja, eine SVG-Variante mit Inter SemiBold daneben für Login/Header.
-4. **Destructive-Hue:** Lokyys destructive `oklch(0.62 0.22 27)` (warmes Rot) — ok, oder bevorzugt Oliver Hermes' pinkigeres `#fb2c36`? Default-Empfehlung: das warmere Rot, passt besser zur ruhigen Indigo-Palette.
+Alle vier Punkte sind entschieden und in den vorhergehenden Sections eingearbeitet:
+
+1. **Tagline → `AI OPERATING SYSTEM`** (in ALL CAPS). Sitzt im Sidebar-Brand-Bereich auf zweiter Zeile unter dem Wordmark, gleiche Typografie wie Sidebar-Section-Headings. Auch in Login/Splash, OG-Image, README. Nicht in Main-UI-Header. → siehe „Schreibweise & Wordmark".
+2. **Hermes-Theme-Whitelist → bleibt erhalten.** Alle 8 Themes (`claude-nous`, `claude-official`, `claude-classic`, `claude-slate` je dark/light) bleiben in der `__root.tsx`-Whitelist und in der Settings-UI selectable. Lokyy-Bridge-Block wird pro Theme additiv eingefügt — Shadcn-Komponenten zeigen überall den Lokyy-Look, Hermes-Komponenten behalten pro Theme ihre Hermes-Charakteristik. Entfernen einzelner Themes ist explizit kein Etappe-1-Scope.
+3. **Logo → Symbol + Wordmark als Lockup-Variante** zusätzlich zum reinen Symbol. Lockup-SVG (124×24 viewBox) ist oben in der Logo-Section ergänzt. Verwendung: Login, Splash, README, OG-Image, Header-Lockups. Sidebar im Workspace nutzt Symbol + separates Wordmark-`<span>` damit die Tagline auf eigener Zeile darunter passt.
+4. **Destructive-Hue → Option A bestätigt** (`oklch(0.62 0.22 27)` = `#E25A4D`, warmes Orange-Rot). Bleibt wie in der Token-Tabelle dokumentiert. Tonal kompatibler mit der Indigo-Palette als Hermes' kühleres Pink-Rot.
+
+→ Mit allen vier Antworten ist Checkpoint #13 erledigt. Phase A (#14) kann starten.

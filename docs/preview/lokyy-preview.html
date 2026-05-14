@@ -110,6 +110,57 @@
     .meta strong { color: white; font-size: 18px; letter-spacing: -0.02em; }
     .meta .right { font-variant-numeric: tabular-nums; }
 
+    /* Logo lockup showcase row */
+    .lockups {
+      max-width: 1920px;
+      margin: 0 auto;
+      padding: 8px 32px 16px;
+      display: flex;
+      gap: 28px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: oklch(0.70 0.01 270);
+      font-size: 11.5px;
+    }
+    .lockups__label {
+      font-size: 10.5px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: oklch(0.55 0.01 270);
+    }
+    .lockup--on-dark {
+      background: oklch(0.18 0.015 270);
+      color: oklch(0.625 0.205 280); /* primary as currentColor */
+      --logo-inner: oklch(0.18 0.015 270);
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: 1px solid oklch(0.28 0.012 270);
+    }
+    .lockup--on-light {
+      background: oklch(0.99 0.003 270);
+      color: oklch(0.555 0.215 280);
+      --logo-inner: oklch(1.00 0 0);
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: 1px solid oklch(0.92 0.008 270);
+    }
+    .lockup__svg { display: block; height: 36px; width: auto; }
+    .symbol-row {
+      display: flex; gap: 12px; align-items: center;
+      padding: 12px 14px;
+      border-radius: 10px;
+    }
+    .symbol-row--on-dark {
+      background: oklch(0.18 0.015 270);
+      color: oklch(0.625 0.205 280);
+      --logo-inner: oklch(0.18 0.015 270);
+      border: 1px solid oklch(0.28 0.012 270);
+    }
+    .symbol-row .sym {
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .symbol-row .sym svg { display: block; }
+
     .stage {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -159,20 +210,24 @@
     .brand__logo {
       width: 28px; height: 28px;
       color: var(--primary);
+      flex: 0 0 28px;
+    }
+    .brand__text {
+      display: grid;
+      gap: 2px;
+      line-height: 1.1;
     }
     .brand__wordmark {
       font-weight: 600; font-size: 17px;
       letter-spacing: -0.02em;
       color: var(--sidebar-foreground);
     }
-    .brand__wordmark em {
-      font-style: normal;
+    .brand__tagline {
+      font-size: 9.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
       color: var(--muted-foreground);
       font-weight: 500;
-      font-size: 11px;
-      margin-left: 6px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
     }
 
     .nav-section { display: flex; flex-direction: column; gap: 2px; }
@@ -370,8 +425,45 @@
 <body>
 
 <div class="meta">
-  <div><strong>lokyy</strong> · design preview · etappe 1 step 3.1</div>
-  <div class="right">indigo · oklch(0.625 0.205 280) · #6E63F2 · radius 0.625rem</div>
+  <div><strong>lokyy</strong> · design preview · etappe 1 step 3.1 · checkpoint #13 v2</div>
+  <div class="right">indigo · oklch(0.625 0.205 280) · #6E63F2 · radius 0.625rem · tagline: AI Operating System</div>
+</div>
+
+<div class="lockups">
+  <span class="lockups__label">Logo lockup (Symbol + Wordmark) · for login / splash / README / OG-image</span>
+
+  <div class="lockup--on-dark" title="On dark surface">
+    <svg class="lockup__svg" viewBox="0 0 124 24" fill="none" aria-label="lokyy">
+      <rect x="0" y="0" width="24" height="24" rx="5" fill="currentColor"/>
+      <circle cx="7" cy="7" r="2.5" fill="var(--logo-inner, #ffffff)"/>
+      <text x="34" y="17.5"
+            font-family="Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+            font-weight="600" font-size="18"
+            letter-spacing="-0.4"
+            fill="currentColor">lokyy</text>
+    </svg>
+  </div>
+
+  <div class="lockup--on-light" title="On light surface">
+    <svg class="lockup__svg" viewBox="0 0 124 24" fill="none" aria-label="lokyy">
+      <rect x="0" y="0" width="24" height="24" rx="5" fill="currentColor"/>
+      <circle cx="7" cy="7" r="2.5" fill="var(--logo-inner, #ffffff)"/>
+      <text x="34" y="17.5"
+            font-family="Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+            font-weight="600" font-size="18"
+            letter-spacing="-0.4"
+            fill="currentColor">lokyy</text>
+    </svg>
+  </div>
+
+  <span class="lockups__label" style="margin-left:auto">Symbol only · 16 / 24 / 48 / 96 px</span>
+
+  <div class="symbol-row symbol-row--on-dark">
+    <span class="sym"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/><circle cx="9" cy="9" r="2.5" fill="var(--logo-inner)"/></svg></span>
+    <span class="sym"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/><circle cx="9" cy="9" r="2.5" fill="var(--logo-inner)"/></svg></span>
+    <span class="sym"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/><circle cx="9" cy="9" r="2.5" fill="var(--logo-inner)"/></svg></span>
+    <span class="sym"><svg width="96" height="96" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/><circle cx="9" cy="9" r="2.5" fill="var(--logo-inner)"/></svg></span>
+  </div>
 </div>
 
 <div class="stage">
@@ -385,7 +477,10 @@
           <rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/>
           <circle cx="9" cy="9" r="2.5" fill="var(--logo-inner)"/>
         </svg>
-        <span class="brand__wordmark">lokyy<em>workspace</em></span>
+        <div class="brand__text">
+          <div class="brand__wordmark">lokyy</div>
+          <div class="brand__tagline">AI Operating System</div>
+        </div>
       </div>
 
       <div class="nav-section">
@@ -501,7 +596,10 @@
           <rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/>
           <circle cx="9" cy="9" r="2.5" fill="var(--logo-inner)"/>
         </svg>
-        <span class="brand__wordmark">lokyy<em>workspace</em></span>
+        <div class="brand__text">
+          <div class="brand__wordmark">lokyy</div>
+          <div class="brand__tagline">AI Operating System</div>
+        </div>
       </div>
 
       <div class="nav-section">
