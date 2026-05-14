@@ -168,11 +168,65 @@ Option B (Conversation-First) ist visuell am ruhigsten, opfert aber das Kanban-M
 
 ---
 
-## Olivers Entscheidung
+## Olivers Entscheidung (2026-05-14)
 
 - [ ] Option A — Hero Mission + Compact Roster
 - [ ] Option B — Single-Column Conversation-First
-- [ ] Option C — Two-Pane Worker-List + Mission
-- [ ] Andere: [eigener Vorschlag — Oliver formuliert]
+- [x] **Option C — Two-Pane Worker-List + Mission** ✅
+- [ ] Andere
 
-Sobald Oliver hier markiert: Implementation-Issue für Etappe 2 öffnen, Sally + Amelia delegieren.
+### Plus Olivers Worker-Vereinfachungs-Insight
+
+> "Wenn ich das richtig sehe sind die Worker nix anderes als vorkonfigurierte Agents. Da reicht ja dann auch der name ein bild und was er macht etc. und beim drauf klicken geht der rest einfach auf etc."
+
+**Spec-Ergänzung für Option-C-Implementation in Etappe 2:**
+
+Die linke Worker-Pane wird **minimalistisch**. Pro Worker-Row:
+
+```
+┌──────────────────────────────────┐
+│ ●  [📷]   Apollo                 │   ← Status-Dot, Avatar/Icon, Name
+│           Research · GPT-5       │   ← Function · Model
+└──────────────────────────────────┘
+```
+
+- **Status-Dot** (8px): grün=live, grau=idle, indigo=on-mission, rot=error
+- **Avatar** (28px): rundes Bild ODER Initial-in-Circle (`bg-primary/15`) wenn kein Bild
+- **Name** (`text-sm font-medium`)
+- **Function · Model** (`text-xs text-muted-foreground`) auf zweiter Zeile
+
+**Click-Behavior:** Click auf Worker-Row öffnet ein **Sheet (Drawer von rechts)** mit allen Details:
+
+- Voll-Profil (Name, Avatar, Funktion, Model, Memory, Skills)
+- Recent Activity (letzte Missions/Outputs)
+- Edit-Config-Button (führt zu Profile-Settings)
+- "Send Solo-Mission"-Button
+
+So bleibt die linke Pane immer ruhig (eine Liste, ein Scroll), und die Detail-Komplexität versteckt sich hinter dem Sheet-Click — exakt das was Oliver gemeint hat: minimaler Roster oben-sichtbar, Details on-demand.
+
+**Right-Pane** bleibt wie in Option C beschrieben: Mission-Editor + Routing + Active-Streams.
+
+### Implications für die Cons-Liste oben
+
+Olivers Vereinfachung neutralisiert zwei der Option-C-Cons:
+
+- ~~Worker-Card-Details brauchen Sheet/Drawer — UX-Komplexität steigt~~ → **gewünscht und elegant**: die Komplexität WANDERT in den Sheet, statt die linke Pane vollzustopfen
+- ~~Linke Pane konkurriert mit der globalen Lokyy-Sidebar~~ → wird durch die minimalistische Row-Struktur (Avatar + 2 Zeilen Text, ~64px hoch) so kompakt, dass die zwei vertikalen Bars als zwei Hierarchie-Ebenen lesbar werden (global nav vs. domain-list)
+
+Verbleibender Real-Trade-off: **Laptop-Width <1280px** — bei sehr schmalen Viewports muss die linke Pane collapsen können (Icon-only mit Hover-Tooltip, ähnlich der existing LokyyShell-Sidebar).
+
+---
+
+## Status
+
+✅ **Spec entschieden. Implementation = Etappe 2.**
+
+Wenn Etappe 1 abgeschlossen ist (Issue #21), öffnet Lokyy ein Etappe-2-Issue:
+
+- Worker-Profil-Schema definieren (Name / Avatar / Function / Model — Daten-Felder + woher kommen sie?)
+- Page-Level-Two-Pane-Layout für `/swarm` (eigener Layout-Wrapper, NICHT die LokyyShell anfassen)
+- Worker-Sheet-Detail-View implementieren (Phase-B `<Sheet>` aus `src/components/ui/sheet.tsx`)
+- Collapse-Verhalten der linken Pane für Viewports <1280px
+- Migration: alte Swarm-Tabs (Control/Board/Inbox/Runtime) ggf. konsolidieren
+
+Sally + Amelia werden delegiert sobald Etappe 1 zu ist.
