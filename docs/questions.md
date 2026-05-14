@@ -71,6 +71,29 @@ Brief-Recommendation für diese Routen war "hide" → Sidebar führt sie nicht a
 
 ---
 
+## Swarm-Page Redesign (Q-005 — Etappe-2-Kandidat)
+
+**Status:** Offen
+**Aufgetaucht in:** Issue [#26](https://github.com/oliverhees/lokyy/issues/26)
+
+Olivers Feedback nach #25-Fixup: "Ich weiß noch nicht wie aber Swarm
+müssen wir irgendwie Moderner gestalten das sieht so null gut aus und
+ist null übersichtlich."
+
+Phase D hatte Swarm-Frame restyled, aber die innere Komposition
+(Main-Agent-Card, Mission-Input, Tabs, Worker-Cards mit Hermes-
+Avataren, Active-Swarm/Office-Toggle) ist visuell unruhig — viele
+kleine Sub-Cards ohne klare visuelle Hierarchie.
+
+**Empfehlung Etappe 2:** UX-Designer-Session (Sally) für eine
+strukturelle Neuordnung. Möglicherweise:
+- Mission-Input + Routing prominent als 1 Hero-Card
+- Worker-Liste tabular oder kompakter Grid
+- Aktive Worker visuell vom Roster trennen
+- Cleaner Status-Indicators
+
+---
+
 ## Weitere Fragen (werden laufend ergänzt)
 
 *Noch keine weiteren offenen Punkte.*
