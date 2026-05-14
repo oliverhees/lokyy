@@ -1,0 +1,45 @@
+# ====================================================================
+# Lokyy outer mono-repo .gitignore
+# See docs/decisions/ADR-001-lokyy-workspace-integration.md
+# ====================================================================
+
+# Inner workspace fork — lives as an independent repo at this path
+# Cloned via `git clone https://github.com/outsourc-e/hermes-workspace.git lokyy-workspace`
+# (Step 1.2 / Issue #2). Do NOT track from outer repo.
+/lokyy-workspace/
+
+# BMAD framework — installer-managed, regenerated on each install
+# (config.toml says: "Regenerated on every install — treat as read-only")
+# Project-shared customization lives in _bmad/custom/ and can be unignored later
+# if/when we want to track team config.
+/_bmad/
+/_bmad-output/
+
+# BMAD installer-generated IDE skill copies (mirror of global skills, not project state)
+/.agents/
+/.claude/
+
+# Local hooks scratch
+/.remember/
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+
+# Env files (never commit)
+.env
+.env.local
+.env.*.local
+
+# Node / pnpm (in case any tooling lands at outer level)
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
