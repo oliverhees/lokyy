@@ -11,6 +11,10 @@ It is the merge-conflict early-warning system: a long list = too deep a cut.
 
 **Etappe 1 (Reskinning):** Phase A + B + C + D + **E done** (Steps 3.2–3.6, Issues [#14](https://github.com/oliverhees/lokyy/issues/14)–[#18](https://github.com/oliverhees/lokyy/issues/18)). Inner workspace pinned to `v2.3.0`, branch `lokyy/main` active. Token-Layer + `@theme inline` + 13 restyled + 8 new components + LokyyShell hinter env-flags + 16 page-files frame-reskinned über 12 Domains + **README/CONTRIBUTING/SECURITY rewritten + Lokyy logo asset set (SVG + 6 PNG sizes + OG) + manifest.json + HTML head + Hermesworld dirs deleted (~24 MB freed)**. Hermes-Marketing-Routen bewusst NICHT reskinned — Brief-konformes "hide" via Sidebar-Omission. LICENSE bitweise unangetastet (MIT, Eric/outsourc-e), interne Code-Identifiers (`hermes-workspace` package name, `claude-*` Theme-IDs, Component-Namen) intakt. Beide env flags default OFF.
 
+## Wie man Lokyy anpasst ohne Upstream-Merges zu zerschiessen
+
+→ **[`docs/customization-guide.md`](docs/customization-guide.md)** — Cookbook für Add / Edit / Replace / Hide mit gemessenen Merge-Costs aus Issue #20, validated Patterns + Anti-Patterns, Schwellen-Check-Anleitung.
+
 ## Integration Model
 
 Inner workspace (`lokyy-workspace/`) is a **nested independent git repo**, not a submodule. The outer repo's `.gitignore` excludes it. See [ADR-001](docs/decisions/ADR-001-lokyy-workspace-integration.md) for the full rationale.
