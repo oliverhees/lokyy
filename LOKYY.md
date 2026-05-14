@@ -9,7 +9,7 @@ It is the merge-conflict early-warning system: a long list = too deep a cut.
 
 ## Status
 
-**Etappe 1 (Reskinning):** In progress — Step 1.2 done. Inner workspace cloned, **pinned to `v2.3.0`**, branch `lokyy/main` active. No upstream files touched yet — reskin work starts after Checkpoint 2.
+**Etappe 1 (Reskinning):** Phase A done (Step 3.2, [Issue #14](https://github.com/oliverhees/lokyy/issues/14)) — inner workspace pinned to `v2.3.0`, branch `lokyy/main` active. Token-Layer + Tailwind-Theme applied additively across all 8 themes. Hermes `--theme-*` declarations untouched.
 
 ## Integration Model
 
@@ -40,6 +40,11 @@ The inner repo has only a single remote (`upstream` → `outsourc-e/hermes-works
 
 | File | Reason | Etappe / Issue |
 |------|--------|----------------|
-| *(none yet)* | Reskin starts after [Issue #13](https://github.com/oliverhees/lokyy/issues/13) (Checkpoint 2) | — |
+| `src/styles.css` | Phase A — Lokyy Shadcn-token bridge block appended inside each of the 8 `[data-theme='claude-*']` blocks (4 dark + 4 light); global `--radius` scale (sm/md/lg/xl) added once in top-level `:root`. Hermes `--theme-*` untouched. | Etappe 1 / [#14](https://github.com/oliverhees/lokyy/issues/14) |
+| `src/routes/__root.tsx` | Phase A — bootstrap `themeScript` now forces `.dark` class on `<html>` when no theme is stored (Lokyy dark-default). Whitelist + theme-switch logic unchanged. | Etappe 1 / [#14](https://github.com/oliverhees/lokyy/issues/14) |
+| `package.json` | Phase A — new dep `tw-animate-css ^1.4.0` (the only Etappe-1-allowed new dep, prereq for Shadcn-style animations in later phases). | Etappe 1 / [#14](https://github.com/oliverhees/lokyy/issues/14) |
+| `pnpm-lock.yaml` | Phase A — lockfile sync for `tw-animate-css`. | Etappe 1 / [#14](https://github.com/oliverhees/lokyy/issues/14) |
+
+**Not touched** (per Phase A brief): `src/scifi-theme.css` — only contains `[data-theme='scifi']` / `'scifi-light'` blocks, both outside the `__root.tsx` whitelist (dead code for the UI). Leaving untouched per read-only-on-non-whitelist convention.
 
 *Updated as Etappe 1 reskinning progresses (Phase A–E, Issues #14–#18).*
