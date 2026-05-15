@@ -1,7 +1,25 @@
-"use client";
-
 import { ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { DEFAULT_THEME, ThemeType } from "@/lib/themes";
+
+function readCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
+function readInitialThemeFromCookies(): ThemeType {
+  const preset = readCookie("theme_preset") as ThemeType["preset"] | undefined;
+  const scale = readCookie("theme_scale") as ThemeType["scale"] | undefined;
+  const radius = readCookie("theme_radius") as ThemeType["radius"] | undefined;
+  const contentLayout = readCookie("theme_content_layout") as ThemeType["contentLayout"] | undefined;
+  return {
+    ...DEFAULT_THEME,
+    preset: preset ?? DEFAULT_THEME.preset,
+    scale: scale ?? DEFAULT_THEME.scale,
+    radius: radius ?? DEFAULT_THEME.radius,
+    contentLayout: contentLayout ?? DEFAULT_THEME.contentLayout,
+  };
+}
 
 function setThemeCookie(key: string, value: string | null) {
   if (typeof window === "undefined") return;
@@ -28,7 +46,7 @@ export function ActiveThemeProvider({
   initialTheme?: ThemeType;
 }) {
   const [theme, setTheme] = useState<ThemeType>(() =>
-    initialTheme ? initialTheme : DEFAULT_THEME
+    initialTheme ? initialTheme : readInitialThemeFromCookies()
   );
 
   useEffect(() => {
