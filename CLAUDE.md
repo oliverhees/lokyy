@@ -110,16 +110,38 @@ Remote `upstream` = `https://github.com/outsourc-e/hermes-workspace`. Remote `or
 
 ---
 
-## Etappe 1 Control Checkpoints
+## Etappe 2 Doctrine (active, 2026-05-15 onwards)
 
-Two mandatory stops before Oliver can unblock:
+Etappe 1 (Reskin) ist gestoppt. Aktive Phase: **Etappe 2 — Lokyy Personal Eigenbau**. Siehe `docs/decisions/ADR-001-pivot-to-greenfield.md` + GitHub Issue #38.
 
-1. **After Step 2:** Present `docs/recon-findings.md` + `docs/licensing-todo.md` — wait for approval before starting Step 3
-2. **At Step 3.1:** Present `docs/lokyy-design.md` (color tokens, logo, radius) — wait for approval before implementation
+### Visibility-First — non-negotiable
+
+**Oliver muss von Tag 1 sehen und kontrollieren können was passiert.** Reihenfolge in jeder Phase: Auth + sichtbares Dashboard zuerst, Backend-Anbindung danach. Kein "Backend-only Sprint" — wenn nichts im Browser zu sehen ist, ist die Phase nicht startbar.
+
+### Playwright-Verification ist Done-Gate — non-negotiable
+
+**Jedes Issue gilt nur dann als done, wenn Playwright es nachgewiesen hat.** Nicht "sollte funktionieren", nicht "TypeScript ist clean", sondern echter Browser-Test der zeigt: User-Flow X funktioniert end-to-end.
+
+- Pro Issue: ein E2E-Test in `lokyy-app/tests/e2e/<issue-slug>.spec.ts`
+- Vor dem Issue-Close: Test grün in `pnpm test:e2e`
+- Screenshot des erfolgreichen Pfads in der Issue als Verification-Evidence
+- Linux-Setup: Playwright mit Chromium (siehe `scripts/verify-ui.ts` als Vorlage)
+- Bei UI-only: visueller Diff-Snapshot reicht; bei Flows: Click-Through-Test mit Assertions
+
+Forbidden: "✓ done" ohne Playwright-Evidence. Auf Verstoß wird das Issue re-opened.
 
 ---
 
-## Hard Constraints for Etappe 1
+## Etappe 1 Control Checkpoints (archived)
+
+Etappe 1 ist abgeschlossen. Diese Checkpoints sind historisch:
+
+1. **After Step 2:** Present `docs/recon-findings.md` + `docs/licensing-todo.md`
+2. **At Step 3.1:** Present `docs/lokyy-design.md`
+
+---
+
+## Hard Constraints for Etappe 1 (archived)
 
 Do not touch:
 - `src/routes/api/*`, `src/routeTree.gen.ts`, `src/router.tsx`
