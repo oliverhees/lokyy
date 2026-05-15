@@ -509,6 +509,13 @@ export default defineConfig({
     port: 3100,
     strictPort: true,
     host: '127.0.0.1',
+    watch: {
+      // data/ wird von der middleware (conversations, settings, ...) zur Laufzeit
+      // beschrieben. Wenn Vite das watched, triggert jeder Write einen Full-Page-
+      // Reload mitten im Chat-Stream → assistant-msg geht verloren, UI springt zum
+      // Welcome-Screen zurück. Daher data/ explizit aus dem Watcher rausnehmen.
+      ignored: ['**/data/**', '**/node_modules/**', '**/.git/**'],
+    },
     proxy: {
       '/api/hermes': {
         target: 'http://127.0.0.1:8642',
