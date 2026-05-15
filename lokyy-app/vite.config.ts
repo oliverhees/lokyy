@@ -64,6 +64,37 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      server.middlewares.use('/api/lokyy/settings', async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/settings-store.ts')) as {
+            readSettings: () => unknown
+            writeSettings: (patch: unknown) => unknown
+          }
+          const method = req.method ?? 'GET'
+          res.setHeader('content-type', 'application/json')
+          if (method === 'GET') {
+            res.end(JSON.stringify({ settings: mod.readSettings() }))
+            return
+          }
+          if (method === 'PATCH') {
+            const bodyText = await new Promise<string>((resolve) => {
+              const chunks: Buffer[] = []
+              req.on('data', (c) => chunks.push(c))
+              req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+            })
+            const patch = bodyText ? JSON.parse(bodyText) : {}
+            res.end(JSON.stringify({ settings: mod.writeSettings(patch) }))
+            return
+          }
+          res.statusCode = 405
+          res.end(JSON.stringify({ error: 'method not allowed' }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: String(err) }))
+        }
+      })
+
       server.middlewares.use('/api/lokyy/integrations', async (req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/integrations-registry.ts')) as {

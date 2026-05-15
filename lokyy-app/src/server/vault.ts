@@ -1,40 +1,47 @@
 import fs from 'node:fs'
 import path from 'node:path'
-
-const VAULT_ROOT = process.env.LOKYY_VAULT_PATH
+import { readSettings } from './settings-store'
 
 export type VaultEntry = {
   name: string
-  path: string // relative to vault root
+  path: string
   type: 'file' | 'dir'
   size?: number
   modified?: string
 }
 
-function ensureSafe(relPath: string): string {
-  if (!VAULT_ROOT) throw new Error('LOKYY_VAULT_PATH not set')
-  const abs = path.resolve(VAULT_ROOT, relPath || '')
-  if (!abs.startsWith(path.resolve(VAULT_ROOT))) {
+function resolveVaultRoot(): string | null {
+  const fromSettings = readSettings().vaultPath
+  if (fromSettings && fromSettings.trim()) return fromSettings.trim()
+  const fromEnv = process.env.LOKYY_VAULT_PATH
+  return fromEnv && fromEnv.trim() ? fromEnv.trim() : null
+}
+
+function ensureSafe(root: string, relPath: string): string {
+  const abs = path.resolve(root, relPath || '')
+  if (!abs.startsWith(path.resolve(root))) {
     throw new Error('path traversal blocked')
   }
   return abs
 }
 
 export function vaultConfigured(): boolean {
-  return !!VAULT_ROOT && fs.existsSync(VAULT_ROOT)
+  const root = resolveVaultRoot()
+  return !!root && fs.existsSync(root)
 }
 
 export function vaultRoot(): string | null {
-  return VAULT_ROOT ?? null
+  return resolveVaultRoot()
 }
 
 export function listVaultDir(relPath = ''): VaultEntry[] {
-  if (!vaultConfigured()) return []
-  const abs = ensureSafe(relPath)
+  const root = resolveVaultRoot()
+  if (!root || !fs.existsSync(root)) return []
+  const abs = ensureSafe(root, relPath)
   if (!fs.existsSync(abs)) return []
   const entries: VaultEntry[] = []
   for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
-    if (e.name.startsWith('.')) continue // skip hidden + .obsidian
+    if (e.name.startsWith('.')) continue
     const childRel = path.join(relPath, e.name)
     const childAbs = path.join(abs, e.name)
     if (e.isDirectory()) {
@@ -57,7 +64,9 @@ export function listVaultDir(relPath = ''): VaultEntry[] {
 }
 
 export function readVaultFile(relPath: string): string {
-  const abs = ensureSafe(relPath)
+  const root = resolveVaultRoot()
+  if (!root) throw new Error('Vault not configured')
+  const abs = ensureSafe(root, relPath)
   if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
     throw new Error('file not found')
   }

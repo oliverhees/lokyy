@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
-import { ArrowLeftIcon, BrainCircuitIcon, KeyIcon, ZapIcon, SendIcon, SearchIcon, PlusIcon, ServerIcon, GlobeIcon, CopyIcon, FileCodeIcon } from 'lucide-react'
+import { ArrowLeftIcon, BrainCircuitIcon, KeyIcon, ZapIcon, SendIcon, SearchIcon, PlusIcon, ServerIcon, GlobeIcon, CopyIcon, FileCodeIcon, Volume2Icon } from 'lucide-react'
+import { readSettings } from '@/lib/lokyy-settings'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -91,7 +92,14 @@ function ChatTab({ agent: _agent }: { agent: Agent }) {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ttsEnabled, setTtsEnabled] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    readSettings()
+      .then((s) => setTtsEnabled(s.ttsEnabled))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -136,13 +144,24 @@ function ChatTab({ agent: _agent }: { agent: Agent }) {
               data-testid={`agent-chat-${m.role}`}
             >
               <div
-                className={`max-w-[80%] space-y-2 rounded-2xl px-4 py-2 text-sm ${
+                className={`relative max-w-[80%] space-y-2 rounded-2xl px-4 py-2 text-sm ${
                   m.role === 'user'
                     ? 'bg-primary text-primary-foreground'
                     : 'border bg-card text-card-foreground'
                 }`}
               >
                 <MessageContent content={m.content} />
+                {ttsEnabled && m.role === 'assistant' ? (
+                  <button
+                    type="button"
+                    onClick={() => speakMessage(m.content)}
+                    className="absolute -bottom-3 -right-3 flex size-7 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-foreground"
+                    title="Antwort vorlesen"
+                    data-testid="chat-tts"
+                  >
+                    <Volume2Icon className="size-3.5" />
+                  </button>
+                ) : null}
               </div>
             </div>
           ))
@@ -338,6 +357,16 @@ function MessageContent({ content }: { content: string }) {
       )}
     </>
   )
+}
+
+function speakMessage(content: string) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  const cleaned = content.replace(/```[\s\S]*?```/g, ' [code block] ')
+  const utterance = new SpeechSynthesisUtterance(cleaned)
+  utterance.lang = 'de-DE'
+  utterance.rate = 1
+  window.speechSynthesis.cancel()
+  window.speechSynthesis.speak(utterance)
 }
 
 function CodeArtifact({ language, code }: { language: string; code: string }) {

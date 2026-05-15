@@ -154,10 +154,14 @@ export const navItems: NavGroup[] = [
     title: "System",
     items: [
       {
+        title: "n8n",
+        href: "/n8n",
+        icon: GithubIcon
+      },
+      {
         title: "Settings",
-        href: "#",
-        icon: SettingsIcon,
-        isComing: true
+        href: "/settings",
+        icon: SettingsIcon
       }
     ]
   }
