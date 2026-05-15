@@ -104,5 +104,6 @@ Wenn Etappe 2 nach Phase 0 (1 Woche) zu schmerzhaft ist, kann ohne Verlust auf d
 ## Related
 
 - Diary heute: `docs/diary/2026-05-15-session-01.md`
-- ADR-002 (folgt): Auth + Gateway-Anbindung detail
+- **[ADR-002 — Auth + Hermes-Gateway-Anbindung](ADR-002-auth-and-gateway-binding.md)** (Phase 0.3 + 0.4 Details)
+- Architecture-Diagram: `docs/architecture/lokyy-personal.mmd`
 - Master-Issue: GitHub `oliverhees/lokyy` „Etappe 2 — Lokyy Personal Eigenbau"
