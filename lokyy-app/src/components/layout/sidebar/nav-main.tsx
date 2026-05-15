@@ -110,9 +110,8 @@ export const navItems: NavGroup[] = [
       },
       {
         title: "Schedule Jobs",
-        href: "#",
-        icon: CalendarIcon,
-        isComing: true
+        href: "/jobs",
+        icon: CalendarIcon
       }
     ]
   },

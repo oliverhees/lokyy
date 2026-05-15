@@ -64,6 +64,20 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      server.middlewares.use('/api/lokyy/jobs', async (_req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/hermes-jobs.ts')) as {
+            listJobs: () => unknown[]
+          }
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ jobs: mod.listJobs() }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ jobs: [], error: String(err) }))
+        }
+      })
+
       server.middlewares.use('/api/lokyy/sessions', async (_req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/hermes-sessions.ts')) as {
