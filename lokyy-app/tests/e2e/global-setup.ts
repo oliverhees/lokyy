@@ -7,11 +7,15 @@ const dataDir = path.resolve(process.cwd(), 'data')
 const dbPath = path.join(dataDir, 'auth.db')
 const overridesPath = path.join(dataDir, 'agent-overrides.json')
 const promptsPath = path.join(dataDir, 'prompts.json')
+const workflowsPath = path.join(dataDir, 'workflows.json')
+const teamsPath = path.join(dataDir, 'teams.json')
 
 export default async function globalSetup() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
   if (fs.existsSync(overridesPath)) fs.unlinkSync(overridesPath)
   if (fs.existsSync(promptsPath)) fs.unlinkSync(promptsPath)
+  if (fs.existsSync(workflowsPath)) fs.unlinkSync(workflowsPath)
+  if (fs.existsSync(teamsPath)) fs.unlinkSync(teamsPath)
 
   // If DB doesn't exist or has no tables, run the Better Auth migrate.
   let needsMigrate = !fs.existsSync(dbPath)

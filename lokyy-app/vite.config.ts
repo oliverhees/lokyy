@@ -94,6 +94,74 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      async function jsonCrudHandler(
+        req: IncomingMessage,
+        res: ServerResponse,
+        modPath: string,
+        listFn: string,
+        createFn: string,
+        updateFn: string,
+        deleteFn: string,
+        pluralKey: string,
+        singleKey: string,
+      ) {
+        try {
+          const mod = (await server.ssrLoadModule(modPath)) as Record<string, unknown>
+          const list = mod[listFn] as () => unknown[]
+          const create = mod[createFn] as (input: unknown) => unknown
+          const update = mod[updateFn] as (id: string, patch: unknown) => unknown
+          const del = mod[deleteFn] as (id: string) => boolean
+          const url = req.url ?? ''
+          const idMatch = url.match(/^\/([^/?#]+)$/)
+          const method = req.method ?? 'GET'
+
+          if (method === 'GET' && url === '/') {
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ [pluralKey]: list() }))
+            return
+          }
+          const bodyText = await new Promise<string>((resolve) => {
+            const chunks: Buffer[] = []
+            req.on('data', (c) => chunks.push(c))
+            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+          })
+          const json = bodyText ? JSON.parse(bodyText) : {}
+
+          if (method === 'POST' && url === '/') {
+            const created = create(json)
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ [singleKey]: created }))
+            return
+          }
+          if (idMatch && method === 'PATCH') {
+            const updated = update(decodeURIComponent(idMatch[1]), json)
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ [singleKey]: updated }))
+            return
+          }
+          if (idMatch && method === 'DELETE') {
+            const ok = del(decodeURIComponent(idMatch[1]))
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ ok }))
+            return
+          }
+          res.statusCode = 404
+          res.end(JSON.stringify({ error: 'not found' }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: String(err) }))
+        }
+      }
+
+      server.middlewares.use('/api/lokyy/workflows', (req: IncomingMessage, res: ServerResponse) =>
+        jsonCrudHandler(req, res, '/src/server/workflows-store.ts', 'listWorkflows', 'createWorkflow', 'updateWorkflow', 'deleteWorkflow', 'workflows', 'workflow'),
+      )
+
+      server.middlewares.use('/api/lokyy/teams', (req: IncomingMessage, res: ServerResponse) =>
+        jsonCrudHandler(req, res, '/src/server/teams-store.ts', 'listTeams', 'createTeam', 'updateTeam', 'deleteTeam', 'teams', 'team'),
+      )
+
       server.middlewares.use('/api/lokyy/prompts', async (req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/prompts-store.ts')) as {

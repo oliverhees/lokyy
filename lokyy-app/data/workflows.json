@@ -1,0 +1,12 @@
+{
+  "workflows": [
+    {
+      "id": "7453c166-519a-4048-b2e9-1f220f1eb48b",
+      "name": "Daily Brief",
+      "description": "",
+      "steps": [],
+      "createdAt": "2026-05-15T18:55:28.911Z",
+      "updatedAt": "2026-05-15T18:55:28.911Z"
+    }
+  ]
+}

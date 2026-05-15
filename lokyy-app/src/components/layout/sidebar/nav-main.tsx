@@ -135,15 +135,13 @@ export const navItems: NavGroup[] = [
     items: [
       {
         title: "Workflows",
-        href: "#",
-        icon: ComponentIcon,
-        isComing: true
+        href: "/workflows",
+        icon: ComponentIcon
       },
       {
         title: "Teams",
-        href: "#",
-        icon: UsersIcon,
-        isComing: true
+        href: "/teams",
+        icon: UsersIcon
       },
       {
         title: "Integrations",

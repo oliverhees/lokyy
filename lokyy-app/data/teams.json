@@ -1,0 +1,14 @@
+{
+  "teams": [
+    {
+      "id": "ef70c5b0-1b0b-4fc9-bd1d-ff675701d256",
+      "name": "Core Reviewers",
+      "description": "",
+      "memberAgentIds": [
+        "default"
+      ],
+      "createdAt": "2026-05-15T18:55:31.203Z",
+      "updatedAt": "2026-05-15T18:55:31.203Z"
+    }
+  ]
+}
