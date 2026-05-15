@@ -23,6 +23,17 @@ function betterAuthDevPlugin(): Plugin {
             res.end(JSON.stringify({ skills }))
             return
           }
+          const mcpsMatch = url.match(/^\/([^/?#]+)\/mcps/)
+          if (mcpsMatch) {
+            const agentId = decodeURIComponent(mcpsMatch[1])
+            const mod = (await server.ssrLoadModule('/src/server/hermes-mcps.ts')) as {
+              listMcpsForAgent: (id: string) => unknown[]
+              listMcpPresets: () => unknown[]
+            }
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ mcps: mod.listMcpsForAgent(agentId), presets: mod.listMcpPresets() }))
+            return
+          }
           const mod = (await server.ssrLoadModule('/src/server/hermes-profiles.ts')) as {
             listAgents: () => unknown
           }

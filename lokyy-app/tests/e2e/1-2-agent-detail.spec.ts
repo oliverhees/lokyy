@@ -44,9 +44,9 @@ test('Phase 1.2 — Agent detail page with chat tab + skills/mcp tabs', async ({
   await page.getByRole('tab', { name: /Skills/ }).click()
   await expect(page.getByTestId('skills-list')).toBeVisible({ timeout: 10_000 })
 
-  // MCP-Tab zeigt Coming-Soon-Card (Phase 1.4 noch offen)
+  // MCP-Tab zeigt Empty-State + Presets (Phase 1.4)
   await page.getByRole('tab', { name: /MCP/ }).click()
-  await expect(page.getByText(/kommt in Phase 1\.4/i)).toBeVisible()
+  await expect(page.getByTestId('mcps-empty').or(page.getByTestId('mcps-list'))).toBeVisible({ timeout: 10_000 })
 
   await page.screenshot({
     path: path.join(SCREENSHOT_DIR, '1-2-agent-detail.png'),

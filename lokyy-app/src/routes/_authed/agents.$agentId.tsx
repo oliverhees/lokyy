@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
-import { ArrowLeftIcon, BrainCircuitIcon, KeyIcon, ZapIcon, SendIcon, SearchIcon } from 'lucide-react'
+import { ArrowLeftIcon, BrainCircuitIcon, KeyIcon, ZapIcon, SendIcon, SearchIcon, PlusIcon, ServerIcon, GlobeIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { listAgents, listAgentSkills, gradientForAgent, initialsFor, type Agent, type AgentSkill } from '@/lib/lokyy-agents'
+import { listAgents, listAgentSkills, listAgentMcps, gradientForAgent, initialsFor, type Agent, type AgentSkill, type AgentMcp, type McpPreset } from '@/lib/lokyy-agents'
 import { chatCompletion, type ChatMessage } from '@/lib/hermes-gateway'
 
 export const Route = createFileRoute('/_authed/agents/$agentId')({
@@ -38,10 +38,7 @@ function AgentDetailPage() {
           <SkillsTab agent={agent} />
         </TabsContent>
         <TabsContent value="mcp" className="mt-4">
-          <ComingSoonCard
-            title="MCP-Server"
-            description="Die MCP-Server-Konfiguration pro Agent — kommt in Phase 1.4."
-          />
+          <McpTab agent={agent} />
         </TabsContent>
       </Tabs>
     </div>
@@ -170,6 +167,125 @@ function ChatTab({ agent: _agent }: { agent: Agent }) {
         </Button>
       </form>
     </Card>
+  )
+}
+
+function McpTab({ agent }: { agent: Agent }) {
+  const [data, setData] = useState<{ mcps: AgentMcp[]; presets: McpPreset[] } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    listAgentMcps(agent.id)
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+  }, [agent.id])
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-sm text-destructive" role="alert">{error}</p>
+        </CardContent>
+      </Card>
+    )
+  }
+  if (data === null) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-sm text-muted-foreground">lade MCP-Server…</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle>MCP-Server</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {data.mcps.length} konfiguriert · Toggle + Add-Wizard kommen in Phase 1.5
+              </p>
+            </div>
+            <Button
+              data-testid="mcp-add"
+              title="Add-Wizard kommt in Phase 1.5"
+              className="cursor-not-allowed"
+              onClick={(e) => e.preventDefault()}
+            >
+              <PlusIcon className="size-4" />
+              MCP-Server hinzufügen
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {data.mcps.length === 0 ? (
+            <p className="text-sm text-muted-foreground" data-testid="mcps-empty">
+              Noch keine MCP-Server für diesen Agent konfiguriert. Wähle unten ein Preset oder leg via CLI an:{' '}
+              <code className="rounded bg-muted px-1">hermes mcp add &lt;name&gt;</code>
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/60" data-testid="mcps-list">
+              {data.mcps.map((mcp) => (
+                <li key={mcp.id} className="flex items-center gap-4 py-3">
+                  <McpTransportIcon transport={mcp.transportType} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-medium">{mcp.name}</span>
+                      <Badge variant="secondary" className="text-xs">{mcp.transportType}</Badge>
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {mcp.command ?? mcp.url ?? '—'}
+                    </p>
+                  </div>
+                  <Switch checked={mcp.status === 'enabled'} disabled />
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {data.presets.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Verfügbare Presets</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {data.presets.length} Vorlagen aus <code className="rounded bg-muted px-1">~/.hermes/mcp-presets.json</code>
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="mcps-presets">
+              {data.presets.slice(0, 12).map((preset) => (
+                <div
+                  key={preset.id}
+                  className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm"
+                  data-testid={`mcp-preset-${preset.id}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <McpTransportIcon transport={preset.template.transportType} />
+                    <span className="truncate font-medium">{preset.name}</span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{preset.description}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
+  )
+}
+
+function McpTransportIcon({ transport }: { transport: string }) {
+  const isHttp = transport === 'http' || transport === 'sse'
+  return (
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted/40 text-muted-foreground">
+      {isHttp ? <GlobeIcon className="size-4" /> : <ServerIcon className="size-4" />}
+    </div>
   )
 }
 

@@ -38,6 +38,40 @@ export async function listAgentSkills(agentId: string): Promise<AgentSkill[]> {
   return data.skills
 }
 
+export type AgentMcp = {
+  id: string
+  name: string
+  transportType: string
+  command?: string
+  args?: string[]
+  url?: string
+  status: 'configured' | 'enabled' | 'disabled'
+}
+
+export type McpPreset = {
+  id: string
+  name: string
+  description: string
+  category: string
+  homepage?: string
+  tags?: string[]
+  template: {
+    name: string
+    transportType: string
+    command?: string
+    args?: string[]
+    url?: string
+  }
+}
+
+export async function listAgentMcps(agentId: string): Promise<{ mcps: AgentMcp[]; presets: McpPreset[] }> {
+  const res = await fetch(`/api/lokyy/agents/${encodeURIComponent(agentId)}/mcps`)
+  if (!res.ok) throw new Error(`Failed to load mcps: ${res.status}`)
+  const data = (await res.json()) as { mcps: AgentMcp[]; presets: McpPreset[]; error?: string }
+  if (data.error) throw new Error(data.error)
+  return { mcps: data.mcps, presets: data.presets }
+}
+
 const GRADIENTS = [
   ['#6366f1', '#8b5cf6'],
   ['#0ea5e9', '#06b6d4'],
