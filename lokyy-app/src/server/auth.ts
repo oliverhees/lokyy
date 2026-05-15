@@ -29,10 +29,16 @@ export const auth = betterAuth({
 export type Session = typeof auth.$Infer.Session
 
 export function ownerExists(): boolean {
+  // Open a fresh DB connection so we don't read a stale view —
+  // Playwright's globalSetup clears rows in the same file, and the
+  // long-lived `db` instance can have an out-of-date prepared-statement cache.
+  const probe = new Database(path.join(dataDir, 'auth.db'), { readonly: true, fileMustExist: false })
   try {
-    const row = db.prepare('SELECT COUNT(*) as c FROM user').get() as { c: number } | undefined
+    const row = probe.prepare('SELECT COUNT(*) as c FROM user').get() as { c: number } | undefined
     return (row?.c ?? 0) > 0
   } catch {
     return false
+  } finally {
+    probe.close()
   }
 }

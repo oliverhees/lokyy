@@ -100,9 +100,8 @@ export const navItems: NavGroup[] = [
       },
       {
         title: "Agents",
-        href: "#",
-        icon: BrainCircuitIcon,
-        isComing: true
+        href: "/agents",
+        icon: BrainCircuitIcon
       },
       {
         title: "Sessions",

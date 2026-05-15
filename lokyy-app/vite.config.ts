@@ -9,6 +9,21 @@ function betterAuthDevPlugin(): Plugin {
   return {
     name: 'lokyy-better-auth',
     configureServer(server) {
+      server.middlewares.use('/api/lokyy/agents', async (_req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/hermes-profiles.ts')) as {
+            listAgents: () => unknown
+          }
+          const agents = mod.listAgents()
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ agents }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ agents: [], error: String(err) }))
+        }
+      })
+
       server.middlewares.use('/api/lokyy/owner-exists', async (_req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/auth.ts')) as { ownerExists: () => boolean }
