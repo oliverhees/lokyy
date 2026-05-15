@@ -125,9 +125,8 @@ export const navItems: NavGroup[] = [
       },
       {
         title: "Second Brain",
-        href: "#",
-        icon: BrainIcon,
-        isComing: true
+        href: "/vault",
+        icon: BrainIcon
       }
     ]
   },

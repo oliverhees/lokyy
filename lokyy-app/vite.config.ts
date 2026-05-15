@@ -64,6 +64,36 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      server.middlewares.use('/api/lokyy/vault', async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/vault.ts')) as {
+            vaultConfigured: () => boolean
+            vaultRoot: () => string | null
+            listVaultDir: (rel: string) => unknown[]
+            readVaultFile: (rel: string) => string
+          }
+          const url = new URL(`http://x${req.url ?? ''}`)
+          const action = url.searchParams.get('action') ?? 'list'
+          const relPath = url.searchParams.get('path') ?? ''
+          res.setHeader('content-type', 'application/json')
+          if (!mod.vaultConfigured()) {
+            res.end(JSON.stringify({ configured: false, root: null, entries: [], content: null }))
+            return
+          }
+          if (action === 'read') {
+            const content = mod.readVaultFile(relPath)
+            res.end(JSON.stringify({ configured: true, root: mod.vaultRoot(), content, path: relPath }))
+            return
+          }
+          const entries = mod.listVaultDir(relPath)
+          res.end(JSON.stringify({ configured: true, root: mod.vaultRoot(), entries, path: relPath }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: String(err) }))
+        }
+      })
+
       server.middlewares.use('/api/lokyy/prompts', async (req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/prompts-store.ts')) as {
