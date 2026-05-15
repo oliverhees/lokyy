@@ -94,6 +94,11 @@ export const navItems: NavGroup[] = [
         icon: ChartPieIcon
       },
       {
+        title: "Chat-Test",
+        href: "/chat-test",
+        icon: MessageSquareIcon
+      },
+      {
         title: "Agents",
         href: "#",
         icon: BrainCircuitIcon,
@@ -102,7 +107,7 @@ export const navItems: NavGroup[] = [
       {
         title: "Sessions",
         href: "#",
-        icon: MessageSquareIcon,
+        icon: ActivityIcon,
         isComing: true
       },
       {

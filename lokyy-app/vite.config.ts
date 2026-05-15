@@ -66,6 +66,23 @@ export default defineConfig({
     port: 3100,
     strictPort: true,
     host: '127.0.0.1',
+    proxy: {
+      '/api/hermes': {
+        target: 'http://127.0.0.1:8642',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/hermes/, ''),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            // Hermes-Gateway lehnt cross-origin Requests mit 403 ab.
+            // Da das Browser-Origin im Dev (http://127.0.0.1:3100) ein anderes ist
+            // als das Gateway (http://127.0.0.1:8642), strippen wir den Origin-Header
+            // bei Proxy-Forwarding — wir agieren als vertrauenswürdiger Server-Side-Proxy.
+            proxyReq.removeHeader('origin')
+            proxyReq.removeHeader('referer')
+          })
+        },
+      },
+    },
   },
   preview: {
     port: 3100,
