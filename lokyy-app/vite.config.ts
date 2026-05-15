@@ -9,8 +9,20 @@ function betterAuthDevPlugin(): Plugin {
   return {
     name: 'lokyy-better-auth',
     configureServer(server) {
-      server.middlewares.use('/api/lokyy/agents', async (_req: IncomingMessage, res: ServerResponse) => {
+      server.middlewares.use('/api/lokyy/agents', async (req: IncomingMessage, res: ServerResponse) => {
         try {
+          const url = req.url ?? ''
+          const skillsMatch = url.match(/^\/([^/?#]+)\/skills/)
+          if (skillsMatch) {
+            const agentId = decodeURIComponent(skillsMatch[1])
+            const mod = (await server.ssrLoadModule('/src/server/hermes-skills.ts')) as {
+              listSkillsForAgent: (id: string) => unknown[]
+            }
+            const skills = mod.listSkillsForAgent(agentId)
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ skills }))
+            return
+          }
           const mod = (await server.ssrLoadModule('/src/server/hermes-profiles.ts')) as {
             listAgents: () => unknown
           }
@@ -20,7 +32,7 @@ function betterAuthDevPlugin(): Plugin {
         } catch (err) {
           res.statusCode = 500
           res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ agents: [], error: String(err) }))
+          res.end(JSON.stringify({ error: String(err) }))
         }
       })
 

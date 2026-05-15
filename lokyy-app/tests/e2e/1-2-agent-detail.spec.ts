@@ -40,11 +40,11 @@ test('Phase 1.2 — Agent detail page with chat tab + skills/mcp tabs', async ({
   await expect(page.getByTestId('agent-chat-input')).toBeVisible()
   await expect(page.getByTestId('agent-chat-send')).toBeVisible()
 
-  // Skills-Tab zeigt Coming-Soon-Card
+  // Skills-Tab zeigt jetzt echte Liste (Phase 1.3)
   await page.getByRole('tab', { name: /Skills/ }).click()
-  await expect(page.getByText(/kommt in Phase 1\.3/i)).toBeVisible()
+  await expect(page.getByTestId('skills-list')).toBeVisible({ timeout: 10_000 })
 
-  // MCP-Tab zeigt Coming-Soon-Card
+  // MCP-Tab zeigt Coming-Soon-Card (Phase 1.4 noch offen)
   await page.getByRole('tab', { name: /MCP/ }).click()
   await expect(page.getByText(/kommt in Phase 1\.4/i)).toBeVisible()
 

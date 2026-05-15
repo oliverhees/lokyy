@@ -19,6 +19,25 @@ export async function listAgents(): Promise<Agent[]> {
   return data.agents
 }
 
+export type AgentSkill = {
+  id: string
+  name: string
+  category: string
+  description: string
+  version: string
+  author: string
+  source: 'builtin' | 'user'
+  status: 'enabled' | 'disabled'
+}
+
+export async function listAgentSkills(agentId: string): Promise<AgentSkill[]> {
+  const res = await fetch(`/api/lokyy/agents/${encodeURIComponent(agentId)}/skills`)
+  if (!res.ok) throw new Error(`Failed to load skills: ${res.status}`)
+  const data = (await res.json()) as { skills: AgentSkill[]; error?: string }
+  if (data.error) throw new Error(data.error)
+  return data.skills
+}
+
 const GRADIENTS = [
   ['#6366f1', '#8b5cf6'],
   ['#0ea5e9', '#06b6d4'],

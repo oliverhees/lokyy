@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
-import { ArrowLeftIcon, BrainCircuitIcon, KeyIcon, ZapIcon, SendIcon } from 'lucide-react'
+import { ArrowLeftIcon, BrainCircuitIcon, KeyIcon, ZapIcon, SendIcon, SearchIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { listAgents, gradientForAgent, initialsFor, type Agent } from '@/lib/lokyy-agents'
+import { listAgents, listAgentSkills, gradientForAgent, initialsFor, type Agent, type AgentSkill } from '@/lib/lokyy-agents'
 import { chatCompletion, type ChatMessage } from '@/lib/hermes-gateway'
 
 export const Route = createFileRoute('/_authed/agents/$agentId')({
@@ -34,10 +35,7 @@ function AgentDetailPage() {
           <ChatTab agent={agent} />
         </TabsContent>
         <TabsContent value="skills" className="mt-4">
-          <ComingSoonCard
-            title="Skills"
-            description="Die Liste aller installierten Skills für diesen Agent mit Toggle pro Skill — kommt in Phase 1.3."
-          />
+          <SkillsTab agent={agent} />
         </TabsContent>
         <TabsContent value="mcp" className="mt-4">
           <ComingSoonCard
@@ -183,6 +181,96 @@ function ComingSoonCard({ title, description }: { title: string; description: st
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function SkillsTab({ agent }: { agent: Agent }) {
+  const [skills, setSkills] = useState<AgentSkill[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    listAgentSkills(agent.id)
+      .then(setSkills)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+  }, [agent.id])
+
+  const filtered = useMemo(() => {
+    if (!skills) return []
+    const q = query.trim().toLowerCase()
+    if (!q) return skills
+    return skills.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.category.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q),
+    )
+  }, [skills, query])
+
+  const enabledCount = skills?.filter((s) => s.status === 'enabled').length ?? 0
+
+  return (
+    <Card>
+      <CardHeader className="gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-1">
+            <CardTitle>Skills</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {skills === null
+                ? 'lade…'
+                : `${enabledCount} von ${skills.length} aktiviert · read-only in Phase 1.3, Toggle kommt in Phase 1.5`}
+            </p>
+          </div>
+          <div className="relative w-64">
+            <SearchIcon className="absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Skills filtern…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-8"
+              data-testid="skills-search"
+            />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <p className="text-sm text-destructive" role="alert">{error}</p>
+        ) : skills === null ? (
+          <p className="text-sm text-muted-foreground">lade Skills…</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Keine Skills für „{query}" gefunden.</p>
+        ) : (
+          <ul className="divide-y divide-border/60" data-testid="skills-list">
+            {filtered.map((skill) => (
+              <li key={skill.id} className="flex items-center gap-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium" data-testid={`skill-name-${skill.name}`}>
+                      {skill.name}
+                    </span>
+                    {skill.category ? (
+                      <Badge variant="secondary" className="text-xs">
+                        {skill.category}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  {skill.description ? (
+                    <p className="truncate text-xs text-muted-foreground">{skill.description}</p>
+                  ) : null}
+                </div>
+                <Switch
+                  checked={skill.status === 'enabled'}
+                  disabled
+                  aria-label={`${skill.name} ${skill.status === 'enabled' ? 'deaktivieren' : 'aktivieren'}`}
+                  data-testid={`skill-toggle-${skill.name}`}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   )
