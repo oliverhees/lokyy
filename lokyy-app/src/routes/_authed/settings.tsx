@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { SaveIcon, BrainIcon, ZapIcon, MicIcon, Volume2Icon } from 'lucide-react'
+import { SaveIcon, BrainIcon, ZapIcon, MicIcon, Volume2Icon, StethoscopeIcon, DownloadIcon, SparklesIcon } from 'lucide-react'
+import { fetchDoctor, fetchBackup, fetchCurator } from '@/lib/lokyy-hermes'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -110,6 +111,8 @@ function SettingsPage() {
         </CardContent>
       </Card>
 
+      <HermesAdminCard />
+
       <Card data-testid="settings-voice">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -152,6 +155,77 @@ function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function HermesAdminCard() {
+  const [doctorOut, setDoctorOut] = useState<string | null>(null)
+  const [backupOut, setBackupOut] = useState<string | null>(null)
+  const [curatorOut, setCuratorOut] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  async function runDoctor() {
+    setBusy('doctor')
+    try {
+      const d = await fetchDoctor()
+      setDoctorOut(d.raw)
+    } finally {
+      setBusy(null)
+    }
+  }
+  async function runBackup() {
+    setBusy('backup')
+    try {
+      const b = await fetchBackup()
+      setBackupOut(b.output + (b.path ? `\n\nZIP: ${b.path}` : ''))
+    } finally {
+      setBusy(null)
+    }
+  }
+  async function runCurator() {
+    setBusy('curator')
+    try {
+      const c = await fetchCurator()
+      setCuratorOut(c.raw)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <Card data-testid="settings-hermes-admin">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <StethoscopeIcon className="size-5 text-muted-foreground" />
+          <CardTitle className="text-base">Hermes Admin</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Button onClick={runDoctor} disabled={busy !== null} variant="outline" data-testid="admin-doctor">
+            <StethoscopeIcon className="size-4" /> System-Check
+          </Button>
+          <Button onClick={runBackup} disabled={busy !== null} variant="outline" data-testid="admin-backup">
+            <DownloadIcon className="size-4" /> Backup
+          </Button>
+          <Button onClick={runCurator} disabled={busy !== null} variant="outline" data-testid="admin-curator">
+            <SparklesIcon className="size-4" /> Curator-Status
+          </Button>
+        </div>
+        {doctorOut ? <OutputBlock label="Doctor" content={doctorOut} /> : null}
+        {backupOut ? <OutputBlock label="Backup" content={backupOut} /> : null}
+        {curatorOut ? <OutputBlock label="Curator" content={curatorOut} /> : null}
+      </CardContent>
+    </Card>
+  )
+}
+
+function OutputBlock({ label, content }: { label: string; content: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-border/60 bg-muted/30 p-3 font-mono text-xs">{content}</pre>
     </div>
   )
 }

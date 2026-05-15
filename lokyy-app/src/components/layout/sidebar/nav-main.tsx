@@ -152,6 +152,46 @@ export const navItems: NavGroup[] = [
         title: "Integrations",
         href: "/integrations",
         icon: KeyIcon
+      },
+      {
+        title: "Channels",
+        href: "/channels",
+        icon: MailIcon
+      }
+    ]
+  },
+  {
+    title: "Hermes Native",
+    items: [
+      {
+        title: "Insights",
+        href: "/insights",
+        icon: ChartBarDecreasingIcon
+      },
+      {
+        title: "Memory",
+        href: "/memory",
+        icon: ArchiveRestoreIcon
+      },
+      {
+        title: "Tools",
+        href: "/tools",
+        icon: GaugeIcon
+      },
+      {
+        title: "Plugins",
+        href: "/plugins",
+        icon: FingerprintIcon
+      },
+      {
+        title: "Webhooks",
+        href: "/webhooks",
+        icon: SquareCheckIcon
+      },
+      {
+        title: "Logs",
+        href: "/logs",
+        icon: ClipboardMinusIcon
       }
     ]
   },

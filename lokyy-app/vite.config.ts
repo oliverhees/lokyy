@@ -277,6 +277,49 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      async function hermesFeature(action: keyof typeof hermesFeaturesActions, args: unknown = {}) {
+        const mod = (await server.ssrLoadModule('/src/server/hermes-features.ts')) as Record<string, (...a: unknown[]) => unknown>
+        return mod[hermesFeaturesActions[action]](args as never)
+      }
+      const hermesFeaturesActions = {
+        insights: 'getInsights',
+        memory: 'getMemoryStatus',
+        logs: 'getLogs',
+        doctor: 'getDoctorReport',
+        backup: 'runBackup',
+        webhooks: 'listWebhooks',
+        plugins: 'listPlugins',
+        tools: 'listTools',
+        curator: 'getCuratorStatus',
+        channels: 'listChannels',
+      } as const
+
+      for (const [route] of Object.entries(hermesFeaturesActions) as Array<[keyof typeof hermesFeaturesActions, string]>) {
+        server.middlewares.use(`/api/lokyy/hermes-${route}`, async (req: IncomingMessage, res: ServerResponse) => {
+          try {
+            res.setHeader('content-type', 'application/json')
+            // Insights: ?days=N | Logs: ?lines=N | Backup: POST
+            const url = new URL(`http://x${req.url ?? ''}`)
+            let result: unknown
+            if (route === 'insights') {
+              result = await hermesFeature(route, Number(url.searchParams.get('days') ?? 30))
+            } else if (route === 'logs') {
+              result = await hermesFeature(route, {
+                lines: Number(url.searchParams.get('lines') ?? 200),
+                level: url.searchParams.get('level') ?? undefined,
+                component: url.searchParams.get('component') ?? undefined,
+              })
+            } else {
+              result = await hermesFeature(route)
+            }
+            res.end(JSON.stringify(result))
+          } catch (err) {
+            res.statusCode = 500
+            res.end(JSON.stringify({ error: String(err) }))
+          }
+        })
+      }
+
       server.middlewares.use('/api/lokyy/tasks', async (_req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/hermes-kanban.ts')) as {
