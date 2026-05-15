@@ -94,8 +94,8 @@ export const navItems: NavGroup[] = [
         icon: ChartPieIcon
       },
       {
-        title: "Chat-Test",
-        href: "/chat-test",
+        title: "Chat",
+        href: "/chat",
         icon: MessageSquareIcon
       },
       {

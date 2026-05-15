@@ -11,6 +11,7 @@ const workflowsPath = path.join(dataDir, 'workflows.json')
 const teamsPath = path.join(dataDir, 'teams.json')
 const integrationsPath = path.join(dataDir, 'integrations.json')
 const settingsPath = path.join(dataDir, 'settings.json')
+const conversationsPath = path.join(dataDir, 'conversations.json')
 
 export default async function globalSetup() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
@@ -20,6 +21,7 @@ export default async function globalSetup() {
   if (fs.existsSync(teamsPath)) fs.unlinkSync(teamsPath)
   if (fs.existsSync(integrationsPath)) fs.unlinkSync(integrationsPath)
   if (fs.existsSync(settingsPath)) fs.unlinkSync(settingsPath)
+  if (fs.existsSync(conversationsPath)) fs.unlinkSync(conversationsPath)
 
   // If DB doesn't exist or has no tables, run the Better Auth migrate.
   let needsMigrate = !fs.existsSync(dbPath)

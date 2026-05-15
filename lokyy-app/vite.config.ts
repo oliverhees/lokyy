@@ -64,6 +64,64 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      server.middlewares.use('/api/lokyy/conversations', async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/conversations-store.ts')) as {
+            listConversations: () => unknown[]
+            getConversation: (id: string) => unknown
+            createConversation: (input: unknown) => unknown
+            updateConversation: (id: string, patch: unknown) => unknown
+            deleteConversation: (id: string) => boolean
+            appendMessage: (id: string, msg: unknown) => unknown
+          }
+          const url = req.url ?? ''
+          const method = req.method ?? 'GET'
+          res.setHeader('content-type', 'application/json')
+
+          if (method === 'GET' && url === '/') {
+            res.end(JSON.stringify({ conversations: mod.listConversations() }))
+            return
+          }
+          const idMatch = url.match(/^\/([^/?#]+)$/)
+          const appendMatch = url.match(/^\/([^/?#]+)\/append$/)
+
+          if (method === 'GET' && idMatch) {
+            const c = mod.getConversation(decodeURIComponent(idMatch[1]))
+            res.end(JSON.stringify({ conversation: c }))
+            return
+          }
+          const bodyText = await new Promise<string>((resolve) => {
+            const chunks: Buffer[] = []
+            req.on('data', (c) => chunks.push(c))
+            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+          })
+          const json = bodyText ? JSON.parse(bodyText) : {}
+
+          if (method === 'POST' && url === '/') {
+            res.end(JSON.stringify({ conversation: mod.createConversation(json) }))
+            return
+          }
+          if (method === 'PATCH' && idMatch) {
+            res.end(JSON.stringify({ conversation: mod.updateConversation(decodeURIComponent(idMatch[1]), json) }))
+            return
+          }
+          if (method === 'DELETE' && idMatch) {
+            res.end(JSON.stringify({ ok: mod.deleteConversation(decodeURIComponent(idMatch[1])) }))
+            return
+          }
+          if (method === 'POST' && appendMatch) {
+            res.end(JSON.stringify({ conversation: mod.appendMessage(decodeURIComponent(appendMatch[1]), json) }))
+            return
+          }
+          res.statusCode = 404
+          res.end(JSON.stringify({ error: 'not found' }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: String(err) }))
+        }
+      })
+
       server.middlewares.use('/api/lokyy/settings', async (req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/settings-store.ts')) as {
