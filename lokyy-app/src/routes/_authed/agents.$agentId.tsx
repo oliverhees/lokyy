@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { listAgents, listAgentSkills, listAgentMcps, toggleAgentSkill, toggleAgentMcp, gradientForAgent, initialsFor, type Agent, type AgentSkill, type AgentMcp, type McpPreset } from '@/lib/lokyy-agents'
+import { AIChatInterface } from '@/components/chat/ai-chat-interface'
 import { chatCompletion, type ChatMessage } from '@/lib/hermes-gateway'
 
 export const Route = createFileRoute('/_authed/agents/$agentId')({
@@ -33,7 +34,11 @@ function AgentDetailPage() {
           <TabsTrigger value="mcp">MCP ({agent.mcpCount})</TabsTrigger>
         </TabsList>
         <TabsContent value="chat" className="mt-4">
-          <ChatTab agent={agent} />
+          <Card className="overflow-hidden p-0">
+            <div className="h-[calc(100vh-22rem)]">
+              <AIChatInterface agent={agent} />
+            </div>
+          </Card>
         </TabsContent>
         <TabsContent value="skills" className="mt-4">
           <SkillsTab agent={agent} />
