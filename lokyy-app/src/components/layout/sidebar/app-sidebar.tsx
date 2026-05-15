@@ -55,7 +55,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton className="hover:text-foreground h-10 group-data-[collapsible=icon]:px-0!">
                   <Logo />
-                  <span className="text-foreground font-semibold">Shadcn UI Kit</span>
+                  <span className="text-foreground font-semibold">Lokyy</span>
                   <ChevronsUpDown className="ml-auto group-data-[collapsible=icon]:hidden" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -100,23 +100,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </ScrollArea>
       </SidebarContent>
       <SidebarFooter>
-        <Card className="gap-4 overflow-hidden py-4 group-data-[collapsible=icon]:hidden">
-          <CardHeader className="px-3">
-            <CardTitle>Unlock Everything</CardTitle>
-            <CardDescription>
-              Get instant access to all premium dashboards, templates, and UI components. Pay once,
-              use forever in unlimited projects.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-3">
-            <Button className="w-full" asChild>
-              <Link href="https://shadcnuikit.com/pricing" target="_blank">
-                <span className="size-2 shrink-0 rounded-full bg-green-500"></span>
-                Get Full Access
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
         <NavUser />
       </SidebarFooter>
     </Sidebar>
