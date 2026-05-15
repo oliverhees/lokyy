@@ -64,6 +64,58 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      server.middlewares.use('/api/lokyy/prompts', async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/prompts-store.ts')) as {
+            listPrompts: () => unknown[]
+            createPrompt: (input: { title: string; body: string; tags?: string[] }) => unknown
+            updatePrompt: (id: string, patch: unknown) => unknown
+            deletePrompt: (id: string) => boolean
+          }
+          const url = req.url ?? ''
+          const idMatch = url.match(/^\/([^/?#]+)$/)
+          const method = req.method ?? 'GET'
+
+          if (method === 'GET' && url === '/') {
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ prompts: mod.listPrompts() }))
+            return
+          }
+
+          const bodyText = await new Promise<string>((resolve) => {
+            const chunks: Buffer[] = []
+            req.on('data', (c) => chunks.push(c))
+            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+          })
+          const json = bodyText ? JSON.parse(bodyText) : {}
+
+          if (method === 'POST' && url === '/') {
+            const created = mod.createPrompt(json)
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ prompt: created }))
+            return
+          }
+          if (idMatch && method === 'PATCH') {
+            const updated = mod.updatePrompt(decodeURIComponent(idMatch[1]), json)
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ prompt: updated }))
+            return
+          }
+          if (idMatch && method === 'DELETE') {
+            const ok = mod.deletePrompt(decodeURIComponent(idMatch[1]))
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ ok }))
+            return
+          }
+          res.statusCode = 404
+          res.end(JSON.stringify({ error: 'not found' }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: String(err) }))
+        }
+      })
+
       server.middlewares.use('/api/lokyy/jobs', async (_req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/hermes-jobs.ts')) as {

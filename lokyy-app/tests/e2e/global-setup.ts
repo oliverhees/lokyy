@@ -6,10 +6,12 @@ import Database from 'better-sqlite3'
 const dataDir = path.resolve(process.cwd(), 'data')
 const dbPath = path.join(dataDir, 'auth.db')
 const overridesPath = path.join(dataDir, 'agent-overrides.json')
+const promptsPath = path.join(dataDir, 'prompts.json')
 
 export default async function globalSetup() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
   if (fs.existsSync(overridesPath)) fs.unlinkSync(overridesPath)
+  if (fs.existsSync(promptsPath)) fs.unlinkSync(promptsPath)
 
   // If DB doesn't exist or has no tables, run the Better Auth migrate.
   let needsMigrate = !fs.existsSync(dbPath)

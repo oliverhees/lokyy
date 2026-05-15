@@ -120,9 +120,8 @@ export const navItems: NavGroup[] = [
     items: [
       {
         title: "Prompt Library",
-        href: "#",
-        icon: StickyNoteIcon,
-        isComing: true
+        href: "/prompts",
+        icon: StickyNoteIcon
       },
       {
         title: "Second Brain",
