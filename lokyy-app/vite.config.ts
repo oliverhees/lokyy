@@ -1,14 +1,61 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import path from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+
+function betterAuthDevPlugin(): Plugin {
+  return {
+    name: 'lokyy-better-auth',
+    configureServer(server) {
+      server.middlewares.use('/api/lokyy/owner-exists', async (_req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/auth.ts')) as { ownerExists: () => boolean }
+          const exists = mod.ownerExists()
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ ownerExists: exists }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ ownerExists: false, error: String(err) }))
+        }
+      })
+
+      server.middlewares.use('/api/auth', async (req: IncomingMessage, res: ServerResponse) => {
+        const { auth } = await server.ssrLoadModule('/src/server/auth.ts')
+        const url = `http://${req.headers.host}/api/auth${req.url ?? ''}`
+        const body = await new Promise<Buffer>((resolve) => {
+          const chunks: Buffer[] = []
+          req.on('data', (c) => chunks.push(c))
+          req.on('end', () => resolve(Buffer.concat(chunks)))
+        })
+        const headers = new Headers()
+        for (const [k, v] of Object.entries(req.headers)) {
+          if (typeof v === 'string') headers.set(k, v)
+          else if (Array.isArray(v)) headers.set(k, v.join(', '))
+        }
+        const request = new Request(url, {
+          method: req.method,
+          headers,
+          body: req.method === 'GET' || req.method === 'HEAD' ? undefined : body,
+        })
+        const response: Response = await auth.handler(request)
+        res.statusCode = response.status
+        response.headers.forEach((value, key) => res.setHeader(key, value))
+        const responseBody = await response.arrayBuffer()
+        res.end(Buffer.from(responseBody))
+      })
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
     TanStackRouterVite({ routesDirectory: './src/routes', generatedRouteTree: './src/routeTree.gen.ts' }),
     react(),
     tailwindcss(),
+    betterAuthDevPlugin(),
   ],
   resolve: {
     alias: {
