@@ -1,5 +1,7 @@
-# Auth DB lives here — never commit
+# All user data lives here — never commit
 *.db
 *.db-journal
 *.db-shm
 *.db-wal
+*.json
+*.zip
