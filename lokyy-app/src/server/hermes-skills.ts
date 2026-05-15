@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { isSkillDisabled } from './agent-overrides'
 
 export type AgentSkill = {
   id: string
@@ -31,21 +32,27 @@ function parseFrontmatter(raw: string): Record<string, string> {
   return out
 }
 
-function readSkill(categoryDir: string, skillName: string, category: string): AgentSkill | null {
+function readSkill(
+  categoryDir: string,
+  skillName: string,
+  category: string,
+  agentId: string,
+): AgentSkill | null {
   const skillDir = path.join(categoryDir, skillName)
   const skillFile = path.join(skillDir, 'SKILL.md')
   if (!fs.existsSync(skillFile)) return null
   const raw = fs.readFileSync(skillFile, 'utf8')
   const fm = parseFrontmatter(raw)
+  const id = `${category}/${skillName}`
   return {
-    id: `${category}/${skillName}`,
+    id,
     name: fm.name || skillName,
     category,
     description: fm.description || '',
     version: fm.version || '',
     author: fm.author || '',
     source: 'builtin',
-    status: 'enabled',
+    status: isSkillDisabled(agentId, id) ? 'disabled' : 'enabled',
   }
 }
 
@@ -61,12 +68,12 @@ export function listSkillsForAgent(agentId: string): AgentSkill[] {
     if (hasSubDirs) {
       for (const sub of inner) {
         if (sub.isDirectory()) {
-          const s = readSkill(categoryDir, sub.name, entry.name)
+          const s = readSkill(categoryDir, sub.name, entry.name, agentId)
           if (s) skills.push(s)
         }
       }
     } else {
-      const s = readSkill(root, entry.name, '')
+      const s = readSkill(root, entry.name, '', agentId)
       if (s) skills.push(s)
     }
   }

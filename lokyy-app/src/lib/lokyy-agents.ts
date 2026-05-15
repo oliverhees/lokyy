@@ -72,6 +72,20 @@ export async function listAgentMcps(agentId: string): Promise<{ mcps: AgentMcp[]
   return { mcps: data.mcps, presets: data.presets }
 }
 
+async function postToggle(path: string): Promise<{ nowEnabled: boolean }> {
+  const res = await fetch(path, { method: 'POST' })
+  if (!res.ok) throw new Error(`Toggle failed: ${res.status}`)
+  return (await res.json()) as { nowEnabled: boolean }
+}
+
+export function toggleAgentSkill(agentId: string, skillId: string): Promise<{ nowEnabled: boolean }> {
+  return postToggle(`/api/lokyy/agents/${encodeURIComponent(agentId)}/skills/${encodeURIComponent(skillId)}/toggle`)
+}
+
+export function toggleAgentMcp(agentId: string, mcpId: string): Promise<{ nowEnabled: boolean }> {
+  return postToggle(`/api/lokyy/agents/${encodeURIComponent(agentId)}/mcps/${encodeURIComponent(mcpId)}/toggle`)
+}
+
 const GRADIENTS = [
   ['#6366f1', '#8b5cf6'],
   ['#0ea5e9', '#06b6d4'],

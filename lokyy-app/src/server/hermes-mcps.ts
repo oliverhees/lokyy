@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { isMcpDisabled } from './agent-overrides'
 
 export type AgentMcp = {
   id: string
@@ -73,7 +74,11 @@ export function listMcpsForAgent(agentId: string): AgentMcp[] {
   const cfg = profileConfigPath(agentId)
   if (!fs.existsSync(cfg)) return []
   const yamlText = fs.readFileSync(cfg, 'utf8')
-  return parseMcpServers(yamlText)
+  const parsed = parseMcpServers(yamlText)
+  return parsed.map((m) => ({
+    ...m,
+    status: isMcpDisabled(agentId, m.id) ? 'disabled' : m.status,
+  }))
 }
 
 export function listMcpPresets(): McpPreset[] {

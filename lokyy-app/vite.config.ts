@@ -12,6 +12,23 @@ function betterAuthDevPlugin(): Plugin {
       server.middlewares.use('/api/lokyy/agents', async (req: IncomingMessage, res: ServerResponse) => {
         try {
           const url = req.url ?? ''
+          const toggleSkillMatch = url.match(/^\/([^/?#]+)\/skills\/([^/?#]+)\/toggle$/)
+          const toggleMcpMatch = url.match(/^\/([^/?#]+)\/mcps\/([^/?#]+)\/toggle$/)
+          if ((toggleSkillMatch || toggleMcpMatch) && req.method === 'POST') {
+            const overrides = (await server.ssrLoadModule('/src/server/agent-overrides.ts')) as {
+              toggleSkill: (a: string, id: string) => { nowEnabled: boolean }
+              toggleMcp: (a: string, id: string) => { nowEnabled: boolean }
+            }
+            const m = (toggleSkillMatch ?? toggleMcpMatch)!
+            const agentId = decodeURIComponent(m[1])
+            const targetId = decodeURIComponent(m[2])
+            const result = toggleSkillMatch
+              ? overrides.toggleSkill(agentId, targetId)
+              : overrides.toggleMcp(agentId, targetId)
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify(result))
+            return
+          }
           const skillsMatch = url.match(/^\/([^/?#]+)\/skills/)
           if (skillsMatch) {
             const agentId = decodeURIComponent(skillsMatch[1])

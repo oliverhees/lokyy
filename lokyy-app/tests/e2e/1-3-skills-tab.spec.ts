@@ -10,7 +10,7 @@ const OWNER = {
   password: 'supersecure123',
 }
 
-test('Phase 1.3 — Skills-Tab listet Skills, hat Search + Toggle (disabled)', async ({ page }) => {
+test('Phase 1.3 — Skills-Tab listet Skills, hat Search + Toggle', async ({ page }) => {
   test.setTimeout(60_000)
 
   // Login + navigate
@@ -38,10 +38,10 @@ test('Phase 1.3 — Skills-Tab listet Skills, hat Search + Toggle (disabled)', a
   // Clear search
   await page.getByTestId('skills-search').fill('')
 
-  // Toggle ist disabled (Read-Only in Phase 1.3)
+  // Toggle ist sichtbar und interaktiv (seit Phase 1.5)
   const toggle = page.getByTestId('skill-toggle-claude-code')
   await expect(toggle).toBeVisible()
-  await expect(toggle).toBeDisabled()
+  await expect(toggle).toBeEnabled()
 
   await page.screenshot({
     path: path.join(SCREENSHOT_DIR, '1-3-skills-tab.png'),

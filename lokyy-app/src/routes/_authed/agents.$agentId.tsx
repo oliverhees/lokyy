@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { listAgents, listAgentSkills, listAgentMcps, gradientForAgent, initialsFor, type Agent, type AgentSkill, type AgentMcp, type McpPreset } from '@/lib/lokyy-agents'
+import { listAgents, listAgentSkills, listAgentMcps, toggleAgentSkill, toggleAgentMcp, gradientForAgent, initialsFor, type Agent, type AgentSkill, type AgentMcp, type McpPreset } from '@/lib/lokyy-agents'
 import { chatCompletion, type ChatMessage } from '@/lib/hermes-gateway'
 
 export const Route = createFileRoute('/_authed/agents/$agentId')({
@@ -180,6 +180,24 @@ function McpTab({ agent }: { agent: Agent }) {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
   }, [agent.id])
 
+  async function onToggle(mcp: AgentMcp) {
+    if (!data) return
+    const before = data
+    const optimistic = {
+      ...data,
+      mcps: data.mcps.map((m) =>
+        m.id === mcp.id ? { ...m, status: m.status === 'enabled' ? 'disabled' as const : 'enabled' as const } : m,
+      ),
+    }
+    setData(optimistic)
+    try {
+      await toggleAgentMcp(agent.id, mcp.id)
+    } catch (err) {
+      setData(before)
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   if (error) {
     return (
       <Card>
@@ -207,7 +225,7 @@ function McpTab({ agent }: { agent: Agent }) {
             <div className="space-y-1">
               <CardTitle>MCP-Server</CardTitle>
               <p className="text-xs text-muted-foreground">
-                {data.mcps.length} konfiguriert · Toggle + Add-Wizard kommen in Phase 1.5
+                {data.mcps.length} konfiguriert · Klick auf Switch zum Umschalten · Add-Wizard kommt in Phase 2
               </p>
             </div>
             <Button
@@ -241,7 +259,11 @@ function McpTab({ agent }: { agent: Agent }) {
                       {mcp.command ?? mcp.url ?? '—'}
                     </p>
                   </div>
-                  <Switch checked={mcp.status === 'enabled'} disabled />
+                  <Switch
+                    checked={mcp.status === 'enabled'}
+                    onCheckedChange={() => onToggle(mcp)}
+                    data-testid={`mcp-toggle-${mcp.name}`}
+                  />
                 </li>
               ))}
             </ul>
@@ -327,6 +349,21 @@ function SkillsTab({ agent }: { agent: Agent }) {
 
   const enabledCount = skills?.filter((s) => s.status === 'enabled').length ?? 0
 
+  async function onToggle(skill: AgentSkill) {
+    if (!skills) return
+    const before = skills
+    const optimistic = skills.map((s) =>
+      s.id === skill.id ? { ...s, status: s.status === 'enabled' ? 'disabled' as const : 'enabled' as const } : s,
+    )
+    setSkills(optimistic)
+    try {
+      await toggleAgentSkill(agent.id, skill.id)
+    } catch (err) {
+      setSkills(before)
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="gap-3">
@@ -336,7 +373,7 @@ function SkillsTab({ agent }: { agent: Agent }) {
             <p className="text-xs text-muted-foreground">
               {skills === null
                 ? 'lade…'
-                : `${enabledCount} von ${skills.length} aktiviert · read-only in Phase 1.3, Toggle kommt in Phase 1.5`}
+                : `${enabledCount} von ${skills.length} aktiviert · Klick auf Switch zum Umschalten`}
             </p>
           </div>
           <div className="relative w-64">
@@ -379,7 +416,7 @@ function SkillsTab({ agent }: { agent: Agent }) {
                 </div>
                 <Switch
                   checked={skill.status === 'enabled'}
-                  disabled
+                  onCheckedChange={() => onToggle(skill)}
                   aria-label={`${skill.name} ${skill.status === 'enabled' ? 'deaktivieren' : 'aktivieren'}`}
                   data-testid={`skill-toggle-${skill.name}`}
                 />
