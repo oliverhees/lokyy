@@ -104,6 +104,11 @@ export const navItems: NavGroup[] = [
         icon: BrainCircuitIcon
       },
       {
+        title: "Tasks",
+        href: "/tasks",
+        icon: SquareKanbanIcon
+      },
+      {
         title: "Sessions",
         href: "/sessions",
         icon: ActivityIcon

@@ -277,17 +277,63 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
-      server.middlewares.use('/api/lokyy/jobs', async (_req: IncomingMessage, res: ServerResponse) => {
+      server.middlewares.use('/api/lokyy/tasks', async (_req: IncomingMessage, res: ServerResponse) => {
         try {
-          const mod = (await server.ssrLoadModule('/src/server/hermes-jobs.ts')) as {
-            listJobs: () => unknown[]
+          const mod = (await server.ssrLoadModule('/src/server/hermes-kanban.ts')) as {
+            kanbanAvailable: () => boolean
+            listKanbanTasks: () => unknown[]
+            listKanbanStatuses: () => string[]
           }
           res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ jobs: mod.listJobs() }))
+          res.end(JSON.stringify({
+            available: mod.kanbanAvailable(),
+            tasks: mod.listKanbanTasks(),
+            statuses: mod.listKanbanStatuses(),
+          }))
         } catch (err) {
           res.statusCode = 500
           res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ jobs: [], error: String(err) }))
+          res.end(JSON.stringify({ available: false, tasks: [], statuses: [], error: String(err) }))
+        }
+      })
+
+      server.middlewares.use('/api/lokyy/jobs', async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/hermes-jobs.ts')) as {
+            listJobs: () => unknown[]
+            createJob: (input: { schedule: string; prompt: string; name?: string }) => { ok: boolean; output: string }
+            deleteJob: (id: string) => { ok: boolean; output: string }
+          }
+          const url = req.url ?? ''
+          const method = req.method ?? 'GET'
+          res.setHeader('content-type', 'application/json')
+
+          if (method === 'GET' && url === '/') {
+            res.end(JSON.stringify({ jobs: mod.listJobs() }))
+            return
+          }
+          const bodyText = await new Promise<string>((resolve) => {
+            const chunks: Buffer[] = []
+            req.on('data', (c) => chunks.push(c))
+            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+          })
+          const json = bodyText ? JSON.parse(bodyText) : {}
+
+          if (method === 'POST' && url === '/') {
+            res.end(JSON.stringify(mod.createJob(json)))
+            return
+          }
+          const delMatch = url.match(/^\/([^/?#]+)$/)
+          if (delMatch && method === 'DELETE') {
+            res.end(JSON.stringify(mod.deleteJob(decodeURIComponent(delMatch[1]))))
+            return
+          }
+          res.statusCode = 404
+          res.end(JSON.stringify({ error: 'not found' }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: String(err) }))
         }
       })
 

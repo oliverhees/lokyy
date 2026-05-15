@@ -55,3 +55,27 @@ export function listJobs(): HermesJob[] {
   const raw = runHermesCronList()
   return parseJobsTable(raw)
 }
+
+export function createJob(input: { schedule: string; prompt: string; name?: string }): { ok: boolean; output: string } {
+  try {
+    const args = ['cron', 'create']
+    if (input.name) args.push('--name', input.name)
+    args.push(input.schedule)
+    if (input.prompt) args.push(input.prompt)
+    const { execFileSync } = require('node:child_process') as typeof import('node:child_process')
+    const out = execFileSync('hermes', args, { encoding: 'utf8', timeout: 10000 })
+    return { ok: true, output: out }
+  } catch (err) {
+    return { ok: false, output: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export function deleteJob(id: string): { ok: boolean; output: string } {
+  try {
+    const { execFileSync } = require('node:child_process') as typeof import('node:child_process')
+    const out = execFileSync('hermes', ['cron', 'remove', id], { encoding: 'utf8', timeout: 10000 })
+    return { ok: true, output: out }
+  } catch (err) {
+    return { ok: false, output: err instanceof Error ? err.message : String(err) }
+  }
+}
