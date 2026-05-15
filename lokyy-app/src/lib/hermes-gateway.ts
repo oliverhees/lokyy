@@ -78,3 +78,63 @@ export async function chatCompletion({ model = 'hermes-agent', messages }: ChatC
     body: JSON.stringify({ model, messages, stream: false }),
   })
 }
+
+export type StreamCallbacks = {
+  onChunk: (delta: string) => void
+  onDone: (full: string) => void
+  onError: (err: Error) => void
+  signal?: AbortSignal
+}
+
+export async function streamChatCompletion(
+  { model = 'hermes-agent', messages }: ChatCompletionInput,
+  cb: StreamCallbacks,
+): Promise<void> {
+  let full = ''
+  try {
+    const res = await fetch(`${BASE}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, messages, stream: true }),
+      signal: cb.signal,
+    })
+    if (!res.ok || !res.body) {
+      throw new HermesGatewayError(`Stream failed: ${res.status}`, res.status)
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const raw of lines) {
+        const line = raw.trim()
+        if (!line.startsWith('data:')) continue
+        const payload = line.slice(5).trim()
+        if (payload === '[DONE]') continue
+        try {
+          const json = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string } }>
+          }
+          const delta = json.choices?.[0]?.delta?.content
+          if (delta) {
+            full += delta
+            cb.onChunk(delta)
+          }
+        } catch {
+          // ignore malformed SSE frames (heartbeats etc.)
+        }
+      }
+    }
+    cb.onDone(full)
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      cb.onDone(full)
+      return
+    }
+    cb.onError(err instanceof Error ? err : new Error(String(err)))
+  }
+}

@@ -24,15 +24,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { ChatContainer } from '@/components/ui/custom/prompt/chat-container'
 import { Message, MessageAction, MessageActions, MessageContent } from '@/components/ui/custom/prompt/message'
-import { PromptLoader } from '@/components/ui/custom/prompt/loader'
 import { Suggestion } from '@/components/ui/custom/prompt/suggestion'
+import { ThinkingStatus } from '@/components/chat/thinking-status'
 import { ChatSidebar } from '@/components/chat/chat-sidebar'
 import { ArtifactPanel, extractArtifacts, type Artifact } from '@/components/chat/artifact-panel'
 import { AIOrb } from '@/components/chat/ai-orb'
 import { UsageMeter } from '@/components/chat/usage-meter'
 import { SlashCommandsPopover, type SlashCommand } from '@/components/chat/slash-commands'
 import { ThinkingDisplay, extractThinking } from '@/components/chat/thinking-display'
-import { chatCompletion, type ChatMessage } from '@/lib/hermes-gateway'
+import { streamChatCompletion, type ChatMessage } from '@/lib/hermes-gateway'
 import { readSettings, patchSettings, type LokyySettings } from '@/lib/lokyy-settings'
 import {
   listConversations,
@@ -66,6 +66,12 @@ function speakMessage(content: string) {
 const THINKING_PROMPT =
   'Bevor du antwortest, denke laut nach. Schreibe deinen Gedankengang in <thinking>...</thinking> Tags, danach gib die Antwort an den User.'
 
+const LOKYY_CHAT_SYSTEM =
+  'Du bist Lokyy-Chat. Wichtige Output-Regeln:\n' +
+  '1. Code, HTML, JSON, SVG, Markdown immer als Markdown-fenced-code-block in deiner Antwort schreiben (```html ... ``` etc.). Lokyy rendert das automatisch als Artefakt im Side-Panel.\n' +
+  '2. Verwende NIEMALS file/terminal/code_execution Tools, um Dateien auf der Festplatte zu erstellen, schreiben oder zu lesen, außer der User fragt explizit nach Filesystem-Operationen.\n' +
+  '3. Antworte in derselben Sprache wie der User. Klar, knapp, freundlich.'
+
 function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -76,6 +82,7 @@ function ChatPage() {
   const [settings, setSettings] = useState<LokyySettings | null>(null)
   const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [streamingText, setStreamingText] = useState('')
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -197,37 +204,50 @@ function ChatPage() {
     setPrompt('')
     setBusy(true)
 
-    try {
-      const baseMessages: ChatMessage[] = (updated?.messages ?? []).map((m) => ({
-        role: m.role,
-        content: m.content,
-      }))
-      const messages: ChatMessage[] = settings?.thinkingEnabled
-        ? [{ role: 'system' as const, content: THINKING_PROMPT }, ...baseMessages]
-        : baseMessages
-      const completion = await chatCompletion({ messages })
-      const reply = completion.choices[0]?.message
-      if (reply) {
-        const c2 = await appendMessage(conv.id, {
-          role: 'assistant',
-          content: reply.content,
-          at: new Date().toISOString(),
-        })
-        setActiveConv(c2)
-        await refresh()
+    const baseMessages: ChatMessage[] = (updated?.messages ?? []).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }))
+    const systemMessages: ChatMessage[] = []
+    systemMessages.push({ role: 'system', content: LOKYY_CHAT_SYSTEM })
+    if (settings?.thinkingEnabled) systemMessages.push({ role: 'system', content: THINKING_PROMPT })
+    const messages = [...systemMessages, ...baseMessages]
 
-        if (settings?.autoOpenArtifacts) {
-          const { cleanContent } = extractThinking(reply.content)
-          const arts = extractArtifacts(cleanContent)
-          if (arts.length > 0) setActiveArtifact(arts[arts.length - 1])
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBusy(false)
-      abortRef.current = null
-    }
+    setStreamingText('')
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
+    await streamChatCompletion(
+      { messages },
+      {
+        signal: ctrl.signal,
+        onChunk: (delta) => setStreamingText((prev) => prev + delta),
+        onError: (err) => {
+          setError(err.message)
+          setBusy(false)
+          abortRef.current = null
+        },
+        onDone: async (full) => {
+          setStreamingText('')
+          if (full.trim()) {
+            const c2 = await appendMessage(conv.id, {
+              role: 'assistant',
+              content: full,
+              at: new Date().toISOString(),
+            })
+            setActiveConv(c2)
+            await refresh()
+            if (settings?.autoOpenArtifacts) {
+              const { cleanContent } = extractThinking(full)
+              const arts = extractArtifacts(cleanContent)
+              if (arts.length > 0) setActiveArtifact(arts[arts.length - 1])
+            }
+          }
+          setBusy(false)
+          abortRef.current = null
+        },
+      },
+    )
   }
 
   const artifacts = useMemo(() => {
@@ -385,9 +405,17 @@ function ChatPage() {
             )}
             {busy ? (
               <Message className="justify-start">
-                <div className="flex items-center gap-3">
-                  <AIOrb size={32} />
-                  <PromptLoader variant="dots" />
+                <div className="flex max-w-[80%] flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <AIOrb size={28} />
+                    <ThinkingStatus />
+                  </div>
+                  {streamingText ? (
+                    <div className="whitespace-pre-wrap text-sm" data-testid="streaming-text">
+                      {extractThinking(streamingText).cleanContent}
+                      <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-primary align-middle" />
+                    </div>
+                  ) : null}
                 </div>
               </Message>
             ) : null}
@@ -425,7 +453,19 @@ function ChatPage() {
                 </Button>
               </PromptInputAction>
               {busy ? (
-                <PromptInputAction tooltip="Stop"><Button variant="ghost" size="icon" className="size-9" onClick={() => setBusy(false)}><SquareIcon className="size-4" /></Button></PromptInputAction>
+                <PromptInputAction tooltip="Stop">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-9"
+                    onClick={() => {
+                      abortRef.current?.abort()
+                      setBusy(false)
+                    }}
+                  >
+                    <SquareIcon className="size-4" />
+                  </Button>
+                </PromptInputAction>
               ) : (
                 <PromptInputAction tooltip="Senden"><Button size="icon" className="size-9" onClick={submit} disabled={!prompt.trim()} data-testid="chat-send"><ArrowUpIcon className="size-4" /></Button></PromptInputAction>
               )}
