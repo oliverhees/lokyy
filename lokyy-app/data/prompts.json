@@ -1,15 +1,15 @@
 {
   "prompts": [
     {
-      "id": "3d44f23d-b24d-4131-9595-e3000c554a2f",
+      "id": "333a88fa-cef2-40b0-9631-7cb554e255f5",
       "title": "Code Review Brief",
       "body": "Review this PR with focus on: security, perf, readability.",
       "tags": [
         "coding",
         "review"
       ],
-      "createdAt": "2026-05-15T18:55:23.011Z",
-      "updatedAt": "2026-05-15T18:55:23.011Z"
+      "createdAt": "2026-05-15T19:06:42.167Z",
+      "updatedAt": "2026-05-15T19:06:42.167Z"
     }
   ]
 }

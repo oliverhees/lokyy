@@ -64,6 +64,38 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      server.middlewares.use('/api/lokyy/integrations', async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/integrations-registry.ts')) as {
+            listIntegrations: () => unknown[]
+            connectIntegration: (id: string) => { ok: boolean }
+            disconnectIntegration: (id: string) => { ok: boolean }
+          }
+          const url = req.url ?? ''
+          const method = req.method ?? 'GET'
+          if (method === 'GET' && url === '/') {
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ integrations: mod.listIntegrations() }))
+            return
+          }
+          const connectMatch = url.match(/^\/([^/?#]+)\/(connect|disconnect)$/)
+          if (connectMatch && method === 'POST') {
+            const id = decodeURIComponent(connectMatch[1])
+            const action = connectMatch[2]
+            const result = action === 'connect' ? mod.connectIntegration(id) : mod.disconnectIntegration(id)
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify(result))
+            return
+          }
+          res.statusCode = 404
+          res.end(JSON.stringify({ error: 'not found' }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: String(err) }))
+        }
+      })
+
       server.middlewares.use('/api/lokyy/vault', async (req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/vault.ts')) as {

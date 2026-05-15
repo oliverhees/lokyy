@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
-import { ArrowLeftIcon, BrainCircuitIcon, KeyIcon, ZapIcon, SendIcon, SearchIcon, PlusIcon, ServerIcon, GlobeIcon } from 'lucide-react'
+import { ArrowLeftIcon, BrainCircuitIcon, KeyIcon, ZapIcon, SendIcon, SearchIcon, PlusIcon, ServerIcon, GlobeIcon, CopyIcon, FileCodeIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -136,13 +136,13 @@ function ChatTab({ agent: _agent }: { agent: Agent }) {
               data-testid={`agent-chat-${m.role}`}
             >
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
+                className={`max-w-[80%] space-y-2 rounded-2xl px-4 py-2 text-sm ${
                   m.role === 'user'
                     ? 'bg-primary text-primary-foreground'
                     : 'border bg-card text-card-foreground'
                 }`}
               >
-                {m.content}
+                <MessageContent content={m.content} />
               </div>
             </div>
           ))
@@ -298,6 +298,68 @@ function McpTab({ agent }: { agent: Agent }) {
           </CardContent>
         </Card>
       ) : null}
+    </div>
+  )
+}
+
+type MessagePart = { type: 'text'; text: string } | { type: 'code'; language: string; code: string }
+
+function parseMessageParts(content: string): MessagePart[] {
+  const parts: MessagePart[] = []
+  const fenceRegex = /```(\w*)\n([\s\S]*?)```/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = fenceRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      const text = content.slice(lastIndex, match.index)
+      if (text.trim()) parts.push({ type: 'text', text })
+    }
+    parts.push({ type: 'code', language: match[1] || 'text', code: match[2] })
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < content.length) {
+    const text = content.slice(lastIndex)
+    if (text.trim()) parts.push({ type: 'text', text })
+  }
+  if (parts.length === 0) parts.push({ type: 'text', text: content })
+  return parts
+}
+
+function MessageContent({ content }: { content: string }) {
+  const parts = parseMessageParts(content)
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.type === 'text' ? (
+          <p key={i} className="whitespace-pre-wrap leading-relaxed">{p.text}</p>
+        ) : (
+          <CodeArtifact key={i} language={p.language} code={p.code} />
+        ),
+      )}
+    </>
+  )
+}
+
+function CodeArtifact({ language, code }: { language: string; code: string }) {
+  async function onCopy() {
+    await navigator.clipboard.writeText(code)
+  }
+  return (
+    <div className="overflow-hidden rounded-md border border-border/60 bg-background/40 text-foreground" data-testid="chat-artifact">
+      <div className="flex items-center justify-between gap-2 border-b border-border/60 bg-muted/30 px-3 py-1.5 text-xs">
+        <span className="flex items-center gap-1 font-mono">
+          <FileCodeIcon className="size-3.5" /> {language || 'text'}
+        </span>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+          title="Copy"
+        >
+          <CopyIcon className="size-3.5" /> copy
+        </button>
+      </div>
+      <pre className="overflow-x-auto px-3 py-2 font-mono text-xs leading-relaxed">{code}</pre>
     </div>
   )
 }

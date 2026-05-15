@@ -145,9 +145,8 @@ export const navItems: NavGroup[] = [
       },
       {
         title: "Integrations",
-        href: "#",
-        icon: KeyIcon,
-        isComing: true
+        href: "/integrations",
+        icon: KeyIcon
       }
     ]
   },
