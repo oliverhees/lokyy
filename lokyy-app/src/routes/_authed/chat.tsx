@@ -434,8 +434,10 @@ function ChatPage() {
                     <ThinkingStatus />
                   </div>
                   {streamingText ? (
-                    <div className="whitespace-pre-wrap text-sm" data-testid="streaming-text">
-                      {extractThinking(streamingText).cleanContent}
+                    <div data-testid="streaming-text">
+                      <MessageContent markdown className="bg-transparent p-0 text-foreground">
+                        {extractThinking(streamingText).cleanContent}
+                      </MessageContent>
                       <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-primary align-middle" />
                     </div>
                   ) : null}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { XIcon, CopyIcon, EyeIcon, FileCodeIcon, DownloadIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -7,6 +7,15 @@ export type Artifact = {
   id: string
   language: string
   code: string
+}
+
+const WIDTH_KEY = 'lokyy-artifact-width'
+const MIN_WIDTH = 320
+const MAX_WIDTH = 1200
+const DEFAULT_WIDTH = 480
+
+function clampWidth(n: number) {
+  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, n))
 }
 
 export function extractArtifacts(content: string): Artifact[] {
@@ -34,15 +43,59 @@ export function ArtifactPanel({
   onClose: () => void
 }) {
   const [tab, setTab] = useState<'code' | 'preview'>('code')
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return DEFAULT_WIDTH
+    const stored = Number(window.localStorage.getItem(WIDTH_KEY))
+    return Number.isFinite(stored) && stored > 0 ? clampWidth(stored) : DEFAULT_WIDTH
+  })
   const canPreview = artifact && /^(html|svg)$/.test(artifact.language)
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(WIDTH_KEY, String(width))
+    } catch {
+      // localStorage might be blocked — width still works in-session
+    }
+  }, [width])
+
+  function onResizeStart(e: React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = width
+    function onMove(ev: MouseEvent) {
+      // Drag-Handle ist am LINKEN Rand des rechten Panels → dragging links
+      // (negativer deltaX) macht das Panel breiter.
+      setWidth(clampWidth(startWidth - (ev.clientX - startX)))
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   if (!artifact) return null
 
   return (
     <aside
-      className="flex h-full w-[480px] shrink-0 flex-col border-l bg-background"
+      className="relative flex h-full shrink-0 flex-col border-l bg-background"
+      style={{ width }}
       data-testid="artifact-panel"
     >
+      <div
+        onMouseDown={onResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Artefakt-Panel-Breite anpassen"
+        title="Ziehen, um das Panel zu verbreitern"
+        className="group absolute left-0 top-0 z-10 h-full w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-primary/30 active:bg-primary/40"
+        data-testid="artifact-resize-handle"
+      />
       <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <FileCodeIcon className="size-4 shrink-0 text-muted-foreground" />
