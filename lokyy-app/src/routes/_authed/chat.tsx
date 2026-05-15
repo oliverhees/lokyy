@@ -11,6 +11,8 @@ import {
   Volume2Icon,
   XIcon,
   FileCodeIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
 } from 'lucide-react'
 import { CopyIcon } from '@radix-ui/react-icons'
 import {
@@ -26,8 +28,12 @@ import { PromptLoader } from '@/components/ui/custom/prompt/loader'
 import { Suggestion } from '@/components/ui/custom/prompt/suggestion'
 import { ChatSidebar } from '@/components/chat/chat-sidebar'
 import { ArtifactPanel, extractArtifacts, type Artifact } from '@/components/chat/artifact-panel'
+import { AIOrb } from '@/components/chat/ai-orb'
+import { UsageMeter } from '@/components/chat/usage-meter'
+import { SlashCommandsPopover, type SlashCommand } from '@/components/chat/slash-commands'
+import { ThinkingDisplay, extractThinking } from '@/components/chat/thinking-display'
 import { chatCompletion, type ChatMessage } from '@/lib/hermes-gateway'
-import { readSettings } from '@/lib/lokyy-settings'
+import { readSettings, patchSettings, type LokyySettings } from '@/lib/lokyy-settings'
 import {
   listConversations,
   createConversation,
@@ -48,12 +54,17 @@ const SUGGESTIONS = [
 
 function speakMessage(content: string) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return
-  const cleaned = content.replace(/```[\s\S]*?```/g, ' [Artefakt] ')
+  const cleaned = content
+    .replace(/```[\s\S]*?```/g, ' [Artefakt] ')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
   const u = new SpeechSynthesisUtterance(cleaned)
   u.lang = 'de-DE'
   window.speechSynthesis.cancel()
   window.speechSynthesis.speak(u)
 }
+
+const THINKING_PROMPT =
+  'Bevor du antwortest, denke laut nach. Schreibe deinen Gedankengang in <thinking>...</thinking> Tags, danach gib die Antwort an den User.'
 
 function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -62,12 +73,18 @@ function ChatPage() {
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [ttsEnabled, setTtsEnabled] = useState(false)
+  const [settings, setSettings] = useState<LokyySettings | null>(null)
   const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    readSettings().then((s) => setTtsEnabled(s.ttsEnabled)).catch(() => {})
+    readSettings()
+      .then((s) => {
+        setSettings(s)
+        setSidebarOpen(!s.chatSidebarCollapsed)
+      })
+      .catch(() => {})
     refresh()
   }, [])
 
@@ -100,8 +117,72 @@ function ChatPage() {
     await refresh()
   }
 
+  function toggleSidebar() {
+    const next = !sidebarOpen
+    setSidebarOpen(next)
+    if (settings) {
+      patchSettings({ chatSidebarCollapsed: !next }).catch(() => {})
+    }
+  }
+
+  async function toggleThinking() {
+    if (!settings) return
+    const s = await patchSettings({ thinkingEnabled: !settings.thinkingEnabled })
+    setSettings(s)
+  }
+
+  const slashCommands: SlashCommand[] = [
+    {
+      trigger: 'clear',
+      label: 'Neuer Chat',
+      description: 'Aktuelle Konversation schließen und neu starten',
+      handler: () => {
+        setPrompt('')
+        newConversation()
+      },
+    },
+    {
+      trigger: 'think',
+      label: 'Thinking umschalten',
+      description: `Extended Thinking ${settings?.thinkingEnabled ? 'AUS' : 'AN'}`,
+      handler: () => {
+        setPrompt('')
+        toggleThinking()
+      },
+    },
+    {
+      trigger: 'tts',
+      label: 'TTS umschalten',
+      description: `Text-to-Speech ${settings?.ttsEnabled ? 'AUS' : 'AN'}`,
+      handler: async () => {
+        setPrompt('')
+        if (!settings) return
+        const s = await patchSettings({ ttsEnabled: !settings.ttsEnabled })
+        setSettings(s)
+      },
+    },
+    {
+      trigger: 'artifacts',
+      label: 'Auto-Open Artefakte',
+      description: `Side-Panel ${settings?.autoOpenArtifacts ? 'NICHT' : 'automatisch'} öffnen`,
+      handler: async () => {
+        setPrompt('')
+        if (!settings) return
+        const s = await patchSettings({ autoOpenArtifacts: !settings.autoOpenArtifacts })
+        setSettings(s)
+      },
+    },
+  ]
+
   async function submit() {
     if (!prompt.trim() || busy) return
+    if (prompt.startsWith('/')) {
+      const cmd = slashCommands.find((c) => c.trigger === prompt.slice(1).trim())
+      if (cmd) {
+        cmd.handler('')
+        return
+      }
+    }
     let conv = activeConv
     if (!conv) {
       conv = await createConversation({})
@@ -117,13 +198,29 @@ function ChatPage() {
     setBusy(true)
 
     try {
-      const messages: ChatMessage[] = (updated?.messages ?? []).map((m) => ({ role: m.role, content: m.content }))
+      const baseMessages: ChatMessage[] = (updated?.messages ?? []).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }))
+      const messages: ChatMessage[] = settings?.thinkingEnabled
+        ? [{ role: 'system' as const, content: THINKING_PROMPT }, ...baseMessages]
+        : baseMessages
       const completion = await chatCompletion({ messages })
       const reply = completion.choices[0]?.message
       if (reply) {
-        const c2 = await appendMessage(conv.id, { role: 'assistant', content: reply.content, at: new Date().toISOString() })
+        const c2 = await appendMessage(conv.id, {
+          role: 'assistant',
+          content: reply.content,
+          at: new Date().toISOString(),
+        })
         setActiveConv(c2)
         await refresh()
+
+        if (settings?.autoOpenArtifacts) {
+          const { cleanContent } = extractThinking(reply.content)
+          const arts = extractArtifacts(cleanContent)
+          if (arts.length > 0) setActiveArtifact(arts[arts.length - 1])
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -138,52 +235,79 @@ function ChatPage() {
     const all: Artifact[] = []
     for (const m of activeConv.messages) {
       if (m.role !== 'assistant') continue
-      all.push(...extractArtifacts(m.content))
+      const { cleanContent } = extractThinking(m.content)
+      all.push(...extractArtifacts(cleanContent))
     }
     return all
   }, [activeConv])
 
   const messages = activeConv?.messages ?? []
   const hasMessages = messages.length > 0
+  const showSlash = prompt.startsWith('/')
 
   return (
     <div className="flex h-[calc(100vh-7rem)] overflow-hidden rounded-md border bg-card" data-testid="chat-page">
-      <ChatSidebar
-        conversations={conversations}
-        activeId={activeId}
-        onSelect={selectConversation}
-        onNew={newConversation}
-        onDelete={removeConversation}
-      />
+      {sidebarOpen ? (
+        <ChatSidebar
+          conversations={conversations}
+          activeId={activeId}
+          onSelect={selectConversation}
+          onNew={newConversation}
+          onDelete={removeConversation}
+        />
+      ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-          <h1 className="truncate text-sm font-medium" data-testid="chat-title">
-            {activeConv?.title ?? 'Neuer Chat'}
-          </h1>
-          {artifacts.length > 0 ? (
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
+          <div className="flex min-w-0 items-center gap-2">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setActiveArtifact(artifacts[artifacts.length - 1])}
-              data-testid="chat-show-artifacts"
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={toggleSidebar}
+              data-testid="chat-toggle-sidebar"
+              title={sidebarOpen ? 'History einklappen' : 'History ausklappen'}
             >
-              <FileCodeIcon className="size-3.5" />
-              {artifacts.length} Artefakt{artifacts.length === 1 ? '' : 'e'}
+              {sidebarOpen ? <PanelLeftCloseIcon className="size-4" /> : <PanelLeftOpenIcon className="size-4" />}
             </Button>
-          ) : null}
+            <h1 className="truncate text-sm font-medium" data-testid="chat-title">
+              {activeConv?.title ?? 'Neuer Chat'}
+            </h1>
+            {settings?.thinkingEnabled ? (
+              <span
+                className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
+                data-testid="thinking-indicator"
+              >
+                Thinking AN
+              </span>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-4">
+            <UsageMeter model={activeConv?.model ?? 'hermes-agent'} messages={messages} />
+            {artifacts.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveArtifact(artifacts[artifacts.length - 1])}
+                data-testid="chat-show-artifacts"
+              >
+                <FileCodeIcon className="size-3.5" />
+                {artifacts.length}
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <ChatContainer className="flex-1 overflow-y-auto">
           <div className="space-y-6 px-6 py-6">
             {!hasMessages ? (
               <div className="flex flex-col items-center justify-center gap-6 py-12 text-center">
-                <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-2xl font-bold text-primary-foreground shadow-inner">
-                  L
-                </div>
+                <AIOrb size={160} />
                 <div className="space-y-1">
                   <h2 className="text-xl font-semibold">Wie kann Lokyy dir heute helfen?</h2>
-                  <p className="text-sm text-muted-foreground">Frag mich alles oder wähle einen Vorschlag.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Tipp <code className="rounded bg-muted px-1">/</code> für Commands oder wähle einen Vorschlag.
+                  </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   {SUGGESTIONS.map((s) => (
@@ -194,7 +318,10 @@ function ChatPage() {
             ) : (
               messages.map((m, i) => {
                 const isUser = m.role === 'user'
-                const msgArtifacts = !isUser ? extractArtifacts(m.content) : []
+                const { thinking, cleanContent } = isUser
+                  ? { thinking: null, cleanContent: m.content }
+                  : extractThinking(m.content)
+                const msgArtifacts = !isUser ? extractArtifacts(cleanContent) : []
                 return (
                   <Message
                     key={i}
@@ -202,6 +329,7 @@ function ChatPage() {
                     data-testid={`chat-${m.role}`}
                   >
                     <div className="max-w-[80%] space-y-2">
+                      {thinking ? <ThinkingDisplay thinking={thinking} /> : null}
                       <MessageContent
                         markdown={!isUser}
                         className={
@@ -210,7 +338,7 @@ function ChatPage() {
                             : 'bg-transparent p-0 text-foreground'
                         }
                       >
-                        {m.content}
+                        {cleanContent}
                       </MessageContent>
                       {msgArtifacts.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
@@ -235,7 +363,7 @@ function ChatPage() {
                               <CopyIcon className="size-3.5" />
                             </Button>
                           </MessageAction>
-                          {ttsEnabled ? (
+                          {settings?.ttsEnabled ? (
                             <MessageAction tooltip="Vorlesen">
                               <Button variant="ghost" size="icon" className="size-7" onClick={() => speakMessage(m.content)}>
                                 <Volume2Icon className="size-3.5" />
@@ -255,19 +383,47 @@ function ChatPage() {
                 )
               })
             )}
-            {busy ? <Message className="justify-start"><PromptLoader variant="dots" /></Message> : null}
+            {busy ? (
+              <Message className="justify-start">
+                <div className="flex items-center gap-3">
+                  <AIOrb size={32} />
+                  <PromptLoader variant="dots" />
+                </div>
+              </Message>
+            ) : null}
           </div>
         </ChatContainer>
 
         {error ? <p className="px-4 pb-2 text-sm text-destructive">{error}</p> : null}
 
-        <div className="border-t p-4">
+        <div className="relative border-t p-4">
+          {showSlash ? (
+            <SlashCommandsPopover
+              query={prompt}
+              commands={slashCommands}
+              onSelect={(c) => c.handler('')}
+            />
+          ) : null}
           <PromptInput value={prompt} onValueChange={setPrompt} onSubmit={submit} isLoading={busy}>
-            <PromptInputTextarea placeholder="Frag Lokyy…" disabled={busy} data-testid="chat-input" />
+            <PromptInputTextarea
+              placeholder="Frag Lokyy… (tipp / für Commands)"
+              disabled={busy}
+              data-testid="chat-input"
+            />
             <PromptInputActions className="justify-end pt-2">
               <PromptInputAction tooltip="Datei (kommt)"><Button variant="ghost" size="icon" className="size-9" disabled><Paperclip className="size-4" /></Button></PromptInputAction>
               <PromptInputAction tooltip="Web-Suche (kommt)"><Button variant="ghost" size="icon" className="size-9" disabled><GlobeIcon className="size-4" /></Button></PromptInputAction>
-              <PromptInputAction tooltip="Deep Think (kommt)"><Button variant="ghost" size="icon" className="size-9" disabled><BrainIcon className="size-4" /></Button></PromptInputAction>
+              <PromptInputAction tooltip={settings?.thinkingEnabled ? 'Thinking AUS' : 'Thinking AN'}>
+                <Button
+                  variant={settings?.thinkingEnabled ? 'default' : 'ghost'}
+                  size="icon"
+                  className="size-9"
+                  onClick={toggleThinking}
+                  data-testid="chat-thinking-toggle"
+                >
+                  <BrainIcon className="size-4" />
+                </Button>
+              </PromptInputAction>
               {busy ? (
                 <PromptInputAction tooltip="Stop"><Button variant="ghost" size="icon" className="size-9" onClick={() => setBusy(false)}><SquareIcon className="size-4" /></Button></PromptInputAction>
               ) : (

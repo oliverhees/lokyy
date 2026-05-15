@@ -8,6 +8,9 @@ export type LokyySettings = {
   n8nUrl: string | null
   ttsEnabled: boolean
   sttEnabled: boolean
+  autoOpenArtifacts: boolean
+  thinkingEnabled: boolean
+  chatSidebarCollapsed: boolean
 }
 
 const DEFAULTS: LokyySettings = {
@@ -15,6 +18,9 @@ const DEFAULTS: LokyySettings = {
   n8nUrl: null,
   ttsEnabled: false,
   sttEnabled: false,
+  autoOpenArtifacts: true,
+  thinkingEnabled: false,
+  chatSidebarCollapsed: false,
 }
 
 function ensureDir() {

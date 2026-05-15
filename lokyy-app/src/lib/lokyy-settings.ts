@@ -3,6 +3,9 @@ export type LokyySettings = {
   n8nUrl: string | null
   ttsEnabled: boolean
   sttEnabled: boolean
+  autoOpenArtifacts: boolean
+  thinkingEnabled: boolean
+  chatSidebarCollapsed: boolean
 }
 
 export async function readSettings(): Promise<LokyySettings> {
