@@ -197,10 +197,11 @@ function ChatPage() {
       setActiveConv(conv)
       setConversations((prev) => [conv!, ...prev])
     }
+    const activeConvId = conv.id
     setError(null)
     const userMsg = { role: 'user' as const, content: prompt.trim(), at: new Date().toISOString() }
-    const updated = await appendMessage(conv.id, userMsg)
-    setActiveConv(updated)
+    const updated = await appendMessage(activeConvId, userMsg)
+    if (updated) setActiveConv(updated)
     setPrompt('')
     setBusy(true)
 
@@ -230,17 +231,39 @@ function ChatPage() {
         onDone: async (full) => {
           setStreamingText('')
           if (full.trim()) {
-            const c2 = await appendMessage(conv.id, {
-              role: 'assistant',
-              content: full,
-              at: new Date().toISOString(),
-            })
-            setActiveConv(c2)
-            await refresh()
-            if (settings?.autoOpenArtifacts) {
-              const { cleanContent } = extractThinking(full)
-              const arts = extractArtifacts(cleanContent)
-              if (arts.length > 0) setActiveArtifact(arts[arts.length - 1])
+            try {
+              const c2 = await appendMessage(activeConvId, {
+                role: 'assistant',
+                content: full,
+                at: new Date().toISOString(),
+              })
+              if (c2) {
+                setActiveConv(c2)
+                await refresh()
+                if (settings?.autoOpenArtifacts) {
+                  const { cleanContent } = extractThinking(full)
+                  const arts = extractArtifacts(cleanContent)
+                  if (arts.length > 0) setActiveArtifact(arts[arts.length - 1])
+                }
+              } else {
+                // Server konnte die Conversation nicht finden — Antwort ging verloren.
+                // Fallback: re-fetch und merge lokal damit der user nichts verliert.
+                setError('Konversation wurde während des Streams modifiziert — Antwort lokal gehalten.')
+                setActiveConv((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        messages: [
+                          ...prev.messages,
+                          { role: 'assistant', content: full, at: new Date().toISOString() },
+                        ],
+                        updatedAt: new Date().toISOString(),
+                      }
+                    : prev,
+                )
+              }
+            } catch (err) {
+              setError(err instanceof Error ? err.message : String(err))
             }
           }
           setBusy(false)

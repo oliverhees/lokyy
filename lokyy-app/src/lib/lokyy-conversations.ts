@@ -43,13 +43,15 @@ export async function deleteConversation(id: string): Promise<void> {
   await fetch(`${BASE}/${id}`, { method: 'DELETE' })
 }
 
-export async function appendMessage(id: string, msg: ConvMessage): Promise<Conversation> {
+export async function appendMessage(id: string, msg: ConvMessage): Promise<Conversation | null> {
   const r = await fetch(`${BASE}/${id}/append`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(msg),
   })
-  return (await r.json()).conversation as Conversation
+  if (!r.ok) return null
+  const data = (await r.json()) as { conversation: Conversation | null; error?: string }
+  return data.conversation ?? null
 }
 
 export function groupByDate(conversations: Conversation[]): Array<{ label: string; items: Conversation[] }> {
