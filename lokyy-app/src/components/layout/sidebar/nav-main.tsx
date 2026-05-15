@@ -105,9 +105,8 @@ export const navItems: NavGroup[] = [
       },
       {
         title: "Sessions",
-        href: "#",
-        icon: ActivityIcon,
-        isComing: true
+        href: "/sessions",
+        icon: ActivityIcon
       },
       {
         title: "Schedule Jobs",

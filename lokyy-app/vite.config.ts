@@ -64,6 +64,20 @@ function betterAuthDevPlugin(): Plugin {
         }
       })
 
+      server.middlewares.use('/api/lokyy/sessions', async (_req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const mod = (await server.ssrLoadModule('/src/server/hermes-sessions.ts')) as {
+            listSessions: () => unknown[]
+          }
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ sessions: mod.listSessions() }))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ sessions: [], error: String(err) }))
+        }
+      })
+
       server.middlewares.use('/api/lokyy/owner-exists', async (_req: IncomingMessage, res: ServerResponse) => {
         try {
           const mod = (await server.ssrLoadModule('/src/server/auth.ts')) as { ownerExists: () => boolean }
