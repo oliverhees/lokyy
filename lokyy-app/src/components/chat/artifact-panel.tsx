@@ -58,25 +58,33 @@ export function ArtifactPanel({
     }
   }, [width])
 
-  function onResizeStart(e: React.MouseEvent<HTMLDivElement>) {
+  function onResizeStart(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault()
+    // Pointer-Capture statt window-Listener: das iframe im Preview-Tab schluckt
+    // sonst die mouseup-Events, sodass der Drag nicht mehr loslässt.
+    const target = e.currentTarget
+    target.setPointerCapture(e.pointerId)
     const startX = e.clientX
     const startWidth = width
-    function onMove(ev: MouseEvent) {
-      // Drag-Handle ist am LINKEN Rand des rechten Panels → dragging links
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    function onMove(ev: PointerEvent) {
+      // Drag-Handle ist am LINKEN Rand des rechten Panels → dragging nach links
       // (negativer deltaX) macht das Panel breiter.
       setWidth(clampWidth(startWidth - (ev.clientX - startX)))
     }
-    function onUp() {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+    function onUp(ev: PointerEvent) {
+      target.removeEventListener('pointermove', onMove)
+      target.removeEventListener('pointerup', onUp)
+      target.removeEventListener('pointercancel', onUp)
+      if (target.hasPointerCapture(ev.pointerId)) target.releasePointerCapture(ev.pointerId)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    target.addEventListener('pointermove', onMove)
+    target.addEventListener('pointerup', onUp)
+    target.addEventListener('pointercancel', onUp)
   }
 
   if (!artifact) return null
@@ -88,12 +96,12 @@ export function ArtifactPanel({
       data-testid="artifact-panel"
     >
       <div
-        onMouseDown={onResizeStart}
+        onPointerDown={onResizeStart}
         role="separator"
         aria-orientation="vertical"
         aria-label="Artefakt-Panel-Breite anpassen"
         title="Ziehen, um das Panel zu verbreitern"
-        className="group absolute left-0 top-0 z-10 h-full w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-primary/30 active:bg-primary/40"
+        className="group absolute left-0 top-0 z-10 h-full w-1.5 -translate-x-1/2 cursor-col-resize touch-none select-none bg-transparent hover:bg-primary/30 active:bg-primary/40"
         data-testid="artifact-resize-handle"
       />
       <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
