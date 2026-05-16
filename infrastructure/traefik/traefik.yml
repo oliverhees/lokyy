@@ -25,7 +25,8 @@ entryPoints:
 
 providers:
   docker:
-    endpoint: "unix:///var/run/docker.sock"
+    # docker-socket-proxy sidecar (NOT direct socket mount) per Phase-8 anti-privilege doctrine.
+    endpoint: "tcp://docker-socket-proxy:2375"
     exposedByDefault: false
     network: lokyy-net
 

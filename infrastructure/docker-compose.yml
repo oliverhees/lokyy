@@ -35,10 +35,31 @@ volumes:
 
 services:
   # =====================================================================
+  # docker-socket-proxy — sanitized API for Traefik (and Phase-8 anti-privilege gate)
+  # Replaces direct /var/run/docker.sock mount in Traefik.
+  # Filtered API surface: only what Traefik needs (containers + networks + services).
+  # =====================================================================
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: lokyy-docker-socket-proxy
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    environment:
+      - CONTAINERS=1
+      - NETWORKS=1
+      - SERVICES=1
+      - TASKS=1
+      - INFO=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # =====================================================================
   # Traefik — reverse-proxy, auto-TLS, dashboard
+  # Uses docker-socket-proxy (NOT direct docker.sock) per Phase-8 anti-privilege doctrine.
   # =====================================================================
   traefik:
-    image: traefik:v3.2
+    image: traefik:latest
     container_name: lokyy-traefik
     restart: unless-stopped
     networks:
@@ -48,11 +69,12 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - traefik-letsencrypt:/letsencrypt
     environment:
       - ACME_EMAIL=${ACME_EMAIL}
+    depends_on:
+      - docker-socket-proxy
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 10s
@@ -89,7 +111,10 @@ services:
       - forgejo-data:/var/lib/gitea
       - forgejo-config:/etc/gitea
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/v1/version || exit 1"]
+      # Forgejo first-run serves install page on /. /api/v1/version requires
+      # install to be completed. Healthcheck uses / which returns 200 in both
+      # install and post-install states.
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -130,9 +155,11 @@ services:
 
   # =====================================================================
   # Lokyy OS Backend (Phase-0 placeholder → Phase-1 real Auth-Gateway)
+  # PHASE-0 NOTE: nginx:alpine used as a placeholder (real image in Phase-1).
+  # traefik/whoami would be informative but lacks wget/sh for healthchecks.
   # =====================================================================
   lokyy-os-be:
-    image: traefik/whoami:latest
+    image: nginx:alpine
     container_name: lokyy-os-be
     restart: unless-stopped
     networks:
@@ -163,9 +190,10 @@ services:
   # Lokyy Brain (placeholder; real image from separate repo in Phase-3)
   # ⚠ ISC-44: lokyy-brain is NOT publicly exposed.
   #   No Traefik labels — only reachable internally on lokyy-net.
+  # PHASE-0 NOTE: nginx:alpine placeholder (real Hono service in Phase-3).
   # =====================================================================
   lokyy-brain:
-    image: traefik/whoami:latest
+    image: nginx:alpine
     container_name: lokyy-brain
     restart: unless-stopped
     networks:
