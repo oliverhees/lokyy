@@ -239,8 +239,45 @@ services:
       retries: 8
       start_period: 60s
     command: ["gateway", "run"]
-  #     retries: 5
-  #     start_period: 30s
+
+  # =====================================================================
+  # Hermes Dashboard — Hermes' own web UI for configuration + chat history.
+  # Same image, same volume as the gateway; shares state. The user runs
+  # `hermes setup` / `hermes login` here interactively (or directly in the
+  # dashboard form) to wire up an LLM provider. Once configured, the
+  # gateway picks up the provider automatically.
+  # =====================================================================
+  hermes-dashboard:
+    image: nousresearch/hermes-agent:latest
+    container_name: lokyy-hermes-dashboard
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    depends_on:
+      - hermes
+    environment:
+      - HERMES_UID=${HERMES_UID:-1000}
+      - HERMES_GID=${HERMES_GID:-1000}
+    volumes:
+      - lokyy-hermes-data:/opt/data
+    # Listen on all interfaces inside the container; Traefik fronts it
+    # with TLS + lokyy.local routing. --insecure is required because the
+    # built-in auth gate is designed for SSH-tunneled localhost access;
+    # we wrap that with Better-Auth via Traefik label-middleware later.
+    command: ["dashboard", "--host", "0.0.0.0", "--no-open", "--insecure"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9119/ > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hermes-dashboard.rule=Host(`${HERMES_DASHBOARD_HOST}`)"
+      - "traefik.http.routers.hermes-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.hermes-dashboard.tls=true"
+      - "traefik.http.routers.hermes-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.hermes-dashboard.loadbalancer.server.port=9119"
 
   # =====================================================================
   # PHASE-2: Lokyy Heartbeat Supervisor (Layer-3 watchdog)
