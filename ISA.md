@@ -4,7 +4,7 @@ task: Lokyy KI-Betriebssystem — Architektur-Design
 slug: lokyy-kios-design
 effort: E3
 phase: plan
-progress: 12/81
+progress: 13/81
 mode: design
 started: 2026-05-16
 updated: 2026-05-16
@@ -84,7 +84,7 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 - [x] ISC-1: Auth-Flow (Login/Logout/Session-Refresh) per Playwright E2E grün — `scripts/verify-phase-1b.ts` 3/3 passed (root→/login redirect, login→dashboard with user email, sign-out→/login)
 - [ ] ISC-2: Dashboard rendert User-State + Liste aktiver Agenten auf Erst-Login
-- [ ] ISC-3: Hermes Agent als Core in Lokyy-Backend eingebunden und HTTP-pingbar
+- [x] ISC-3: Hermes Agent als Core in Lokyy-Backend eingebunden und HTTP-pingbar
 - [ ] ISC-4: Hermes-Self-Learning + autonomous-skill-creation aktiviert + Skill-Output ist im Lokyy-Audit-Log sichtbar
 - [ ] ISC-5: Hermes-eingebauter Cron-Scheduler läuft mit mindestens 3 Lokyy-spezifischen Tasks (Hermes-internal scheduling)
 - [ ] ISC-6: Heartbeat-Cycle (Hermes-cron-task triggert): read Telos+state → plan → act → schreibt Diary in lokyy-brain
@@ -284,6 +284,12 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Changelog
 
+- **2026-05-16T18:30:00Z** — Phase-2a Hermes-Container live — End-to-End-Proxy bis Inference-Layer
+  - **conjectured**: Hermes-Deployment ist riesig: Repo klonen, ~10min build, network_mode:host umkonfigurieren, manuelle Setup-Schritte für Models/Skills, mehrere Sessions.
+  - **refuted_by**: (a) Pre-built Image existiert auf Docker Hub als `nousresearch/hermes-agent:latest` (täglich aktualisiert) — kein Build. (b) Default lokyy-net statt host-network funktioniert für die API-Use-Case fine — `/v1/models` und `/v1/chat/completions` brauchen keinen Host-Net-Zugriff. (c) Hermes bringt sich selbst nach ~30s Bootstrap auf (87 Skills bundled, API-Server auto-startet wenn `API_SERVER_ENABLED=true`). (d) Healthcheck mit Bearer-Auth gegen `/v1/models` ist deterministisch grün auch ohne Provider-Key.
+  - **learned**: Hermes ist viel deployment-freundlicher als gedacht, solange man die Repo-Defaults (`network_mode:host`, bind-mount `~/.hermes`) durch lokyy-stack-Konventionen ersetzt (lokyy-net, named volume). API-Server-Mode + Bearer-Auth-Pattern ist die richtige Integration für ein Multi-Service-Setup wie Lokyy.
+  - **criterion_now**: ISC-3 als done markiert (Hermes HTTP-pingbar via `/v1/models` durch lokyy-os-be). ISC-4 + ISC-5 + ISC-6 bleiben offen (brauchen Lokyy-spezifische Cron-Tasks + autonomous-skill-learning aktiviert + Audit-Log-Bridge). Phase-2b: Heartbeat-Supervisor (ISC-73-81). Phase-2c: erste Lokyy-Cron-Tasks registrieren (ISC-5-6).
+
 - **2026-05-16T17:00:00Z** — Phase-1d API-Stubs — alle Sidebar-Routen klickbar
   - **conjectured**: Generic empty-array stubs reichen aus, FE-Routes rendern dann sinnvolle "leere Listen"-Zustände.
   - **refuted_by**: React crashes mit "Cannot read .map of undefined" wenn die Response-Shape nicht exakt zur TypeScript-Typ-Definition passt (`MemoryStatus`, `InsightsData`, `VaultListResponse` waren in meinem ersten Wurf falsch geformt). FE arbeitet shape-strict.
@@ -390,6 +396,17 @@ During live deploy, two issues were discovered and fixed:
 - [x] **ISC-67** — `cli/lokyy-installer.ts` exists as a single-file Bun script. Five commands implemented: `install`, `up`, `down`, `purge`, `status`. `help` listed each in colored output; unknown command yields exit 2 + help.
 - [x] **ISC-68** — Idempotent confirmed by two consecutive `install` runs against the live stack. Run 1 detected existing values in `.env.local`, generated missing `LOKYY_AGENT_JWT_SECRET`, wrote file (chmod 0600), recreated Traefik (env diff), all 5 services healthy. Run 2 detected all values present, no regeneration, no container churn, all healthy. End-state identical.
 - [x] **ISC-69** — `cmdInstall` polls `docker compose ps --format json` every 2s, parses per-service state and health, exits 0 only when all 5 expected services match `state=running` AND (no health field OR `health=healthy`). Timeout default 90s → exit 3 with status dump. Verified on local stack.
+
+### Phase-2a (Hermes Agent Container) — Winston, 2026-05-16
+
+- **Hermes Agent live im lokyy-stack** als 6. Container (`nousresearch/hermes-agent:latest`, 2.6 GB compressed / 8.5 GB unpacked). Pre-built image direkt von Docker Hub — kein lokaler Build nötig.
+- **Eigenes Volume** `lokyy-hermes-data` — independent von Oliver's existing host `~/.hermes/` CLI install. Beide Hermes-Instanzen coexistieren.
+- **OpenAI-kompatibler API-Server** auf `http://hermes:8642` (internal-only auf lokyy-net), auth-gated via `HERMES_API_KEY` (Bearer-Token, generiert von `lokyy-installer`).
+- **lokyy-os-be `/api/hermes/*` Proxy** — leitet alle Calls inkl. SSE-Streaming an Hermes weiter, injectet Auth-Header. SPA chat-Screen (`lokyy-app/src/routes/_authed/chat.tsx`) ist damit ready for connection.
+- **End-to-end verifiziert** via `scripts/verify-phase-2a.ts` (3/3 pass): sign-in, `/v1/models` listet `hermes-agent`, `/v1/chat/completions` reicht den Request bis zu Hermes durch.
+- **LLM-Provider-Key fehlt noch** — Hermes startet OHNE Provider sauber (Healthcheck grün auf `/v1/models`), aber chat-completion returnt 500 mit klarer Botschaft *"No inference provider configured. Set OPENROUTER_API_KEY etc."*. Oliver muss einen Key in `.env.local` setzen + recreaten.
+- **lokyy-os-be auf v0.4.0** (`Phase-2a hermes proxy`).
+- **Installer** generiert `HERMES_API_KEY` (`openssl rand -hex 32`), warnt wenn kein LLM-Provider-Key gesetzt ist. `EXPECTED_SERVICES` Liste auf 6 erweitert.
 
 ### Phase-1d (API Stubs) — Winston, 2026-05-16
 

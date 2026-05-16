@@ -21,6 +21,8 @@ volumes:
     name: lokyy-traefik-letsencrypt
   lokyy-os-db:
     name: lokyy-os-db
+  lokyy-hermes-data:
+    name: lokyy-hermes-data
   # Reserved for future phases (uncomment when activating the phase):
   # lokyy-brain-vault:    # Phase-3 — lokyy-brain Forgejo working copy
   #   name: lokyy-brain-vault
@@ -139,12 +141,22 @@ services:
     restart: unless-stopped
     networks:
       - lokyy-net
+    extra_hosts:
+      # Optional escape-hatch: lets the container reach a Hermes daemon
+      # running on the host (handy when developing without rebuilding the
+      # Hermes container). Override HERMES_BASE_URL to use it.
+      - "host.docker.internal:host-gateway"
     volumes:
       - lokyy-os-db:/app/data
     environment:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - AUTH_BASE_URL=https://${DOMAIN}
       - AUTH_TRUSTED_ORIGINS=https://${DOMAIN}
+      # Phase-2: in the Lokyy stack Hermes is its own container — fresh
+      # install, config persisted in the lokyy-hermes-data volume. The
+      # user configures it once via hermes.${DOMAIN} (Hermes' own dashboard).
+      - HERMES_API_KEY=${HERMES_API_KEY:-}
+      - HERMES_BASE_URL=${HERMES_BASE_URL:-http://hermes:8642}
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
       interval: 10s
@@ -194,26 +206,85 @@ services:
     #     - lokyy-brain-vault:/vault
 
   # =====================================================================
-  # PHASE-2: Hermes Agent (nousresearch/hermes-agent, MIT)
+  # Hermes Agent (Phase-2a) — nousresearch/hermes-agent, MIT
+  # The agent core: cron scheduler, autonomous skill learning, 40+ tools,
+  # OpenAI-compatible API server on :8642 inside the lokyy-net.
+  # API_SERVER_KEY (HERMES_API_KEY) gates the API; lokyy-os-be proxies with it.
+  # Uses its OWN named volume lokyy-hermes-data — does NOT touch the host's
+  # ~/.hermes (Oliver's standalone CLI install stays independent).
   # =====================================================================
-  # hermes:
-  #   image: nousresearch/hermes-agent:latest
-  #   container_name: lokyy-hermes
-  #   restart: unless-stopped
-  #   networks:
-  #     - lokyy-net
-  #   environment:
-  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #   volumes:
-  #     - hermes-data:/data
-  #     - ${HOME}/.claude/PAI/USER/TELOS:/telos:ro
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -fsS http://localhost:8642/health || exit 1"]
-  #     interval: 15s
-  #     timeout: 5s
-  #     retries: 5
-  #     start_period: 30s
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    container_name: lokyy-hermes
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    environment:
+      - HERMES_UID=${HERMES_UID:-1000}
+      - HERMES_GID=${HERMES_GID:-1000}
+      # OpenAI-compatible API server — gated by HERMES_API_KEY.
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_PORT=8642
+      - API_SERVER_KEY=${HERMES_API_KEY}
+      # LLM provider keys — at least one must be set in .env.local.
+      # Hermes picks the active model via its config; user can change with
+      # `docker compose exec hermes hermes model`.
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - lokyy-hermes-data:/opt/data
+    healthcheck:
+      # API server returns 200 on /v1/models when up + auth'd.
+      # Use bearer auth via API_SERVER_KEY.
+      test:
+        - "CMD-SHELL"
+        - "curl -fsS -H \"Authorization: Bearer $${API_SERVER_KEY}\" http://127.0.0.1:8642/v1/models > /dev/null || exit 1"
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+    command: ["gateway", "run"]
+
+  # =====================================================================
+  # Hermes Dashboard — Hermes' own web UI for configuration + chat history.
+  # Same image, same volume as the gateway; shares state. The user runs
+  # `hermes setup` / `hermes login` here interactively (or directly in the
+  # dashboard form) to wire up an LLM provider. Once configured, the
+  # gateway picks up the provider automatically.
+  # =====================================================================
+  hermes-dashboard:
+    image: nousresearch/hermes-agent:latest
+    container_name: lokyy-hermes-dashboard
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    depends_on:
+      - hermes
+    environment:
+      - HERMES_UID=${HERMES_UID:-1000}
+      - HERMES_GID=${HERMES_GID:-1000}
+    volumes:
+      - lokyy-hermes-data:/opt/data
+    # Listen on all interfaces inside the container; Traefik fronts it
+    # with TLS + lokyy.local routing. --insecure is required because the
+    # built-in auth gate is designed for SSH-tunneled localhost access;
+    # we wrap that with Better-Auth via Traefik label-middleware later.
+    command: ["dashboard", "--host", "0.0.0.0", "--no-open", "--insecure"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9119/ > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hermes-dashboard.rule=Host(`${HERMES_DASHBOARD_HOST}`)"
+      - "traefik.http.routers.hermes-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.hermes-dashboard.tls=true"
+      - "traefik.http.routers.hermes-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.hermes-dashboard.loadbalancer.server.port=9119"
 
   # =====================================================================
   # PHASE-2: Lokyy Heartbeat Supervisor (Layer-3 watchdog)

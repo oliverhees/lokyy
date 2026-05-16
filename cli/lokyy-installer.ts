@@ -42,6 +42,7 @@ const EXPECTED_SERVICES = [
   "lokyy-os-fe",
   "lokyy-os-be",
   "lokyy-brain",
+  "hermes",
 ];
 
 const HEALTHCHECK_TIMEOUT_S = 90;
@@ -240,6 +241,28 @@ async function cmdInstall(): Promise<number> {
       ok(`Generated BETTER_AUTH_SECRET (64 hex chars)`);
     } else {
       ok(`BETTER_AUTH_SECRET present`);
+    }
+
+    // Hermes API server key (Phase-2)
+    if (!current.HERMES_API_KEY) {
+      current.HERMES_API_KEY = await generateJwtSecret();
+      ok(`Generated HERMES_API_KEY (64 hex chars)`);
+    } else {
+      ok(`HERMES_API_KEY present`);
+    }
+
+    // LLM provider key — at least one must be present for Hermes to function.
+    const hasProvider =
+      !!current.OPENROUTER_API_KEY ||
+      !!current.ANTHROPIC_API_KEY ||
+      !!current.OPENAI_API_KEY;
+    if (!hasProvider) {
+      warn(
+        "No LLM provider key set (OPENROUTER_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY). " +
+          "Hermes will start but cannot complete chats until you add one to .env.local."
+      );
+    } else {
+      ok("LLM provider key present");
     }
 
     writeEnvLocal(current);
