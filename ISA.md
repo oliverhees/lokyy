@@ -4,7 +4,7 @@ task: Lokyy KI-Betriebssystem — Architektur-Design
 slug: lokyy-kios-design
 effort: E3
 phase: plan
-progress: 8/81
+progress: 11/81
 mode: design
 started: 2026-05-16
 updated: 2026-05-16
@@ -148,9 +148,9 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 - [ ] ISC-64: Heartbeat- vs Conductor-Ownership dokumentiert (zwei Control-Planes klar abgegrenzt; wer triggert was)
 - [ ] ISC-65: Hermes-Subagent-Spawning für Specialist-Roles (Researcher/Writer/Coder/Curator) konfiguriert; Conductor = parent Hermes-Instance
 - [ ] ISC-66: TelosAdapter-Interface in lokyy-os-be (lib/telos-adapter.ts) — getTelos(field) → string; Impl = volume-read; mock-impl für Tests
-- [ ] ISC-67: `lokyy-installer` CLI exists (bun script `cli/lokyy-installer.ts`) mit `install / up / down / purge / status` Commands
-- [ ] ISC-68: Install-Wizard idempotent — zweimal `lokyy install` lässt System healthy zurück, keine doppelten Volumes/Container
-- [ ] ISC-69: Install-Wizard health-check loop wartet auf alle Container `healthy` bevor success; timeout-handling definiert
+- [x] ISC-67: `lokyy-installer` CLI exists (`cli/lokyy-installer.ts`) mit `install / up / down / purge / status` Commands — verifiziert via `bun cli/lokyy-installer.ts help` (alle 5 Commands gelistet)
+- [x] ISC-68: Install-Wizard idempotent — verifiziert: 1. Lauf generiert fehlende Secrets (LOKYY_AGENT_JWT_SECRET), 2. Lauf erkennt alle Werte vorhanden, kein Re-Generate, gleicher End-State
+- [x] ISC-69: Install-Wizard health-check loop wartet bis alle Container `healthy` (90s default timeout); exit 0 nur bei Erfolg, exit 3 bei Timeout mit Status-Dump
 - [ ] ISC-70: OpenClaw-Adapter in lokyy-os-be (lib/openclaw-adapter.ts) — delegiert Task an OpenClaw-Instanz, parsed Result
 - [ ] ISC-71: Anti: OpenClaw-Adapter shared KEINE Lokyy-Secrets; OpenClaw läuft mit eigenem API-Key-Set
 - [x] ISC-72: Traefik konfiguriert mit auto-TLS (Let's Encrypt) + Docker-Label-Discovery + Dashboard hinter Auth
@@ -284,6 +284,12 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Changelog
 
+- **2026-05-16T13:30:00Z** — Phase-9 abgeschlossen — lokyy-installer CLI live + idempotency verifiziert
+  - **conjectured**: Install-Wizard ist Tooling, kann später kommen wenn Phase-1+ existiert; bis dahin docker compose direkt aufrufen reicht.
+  - **refuted_by**: Phase-9 ist explizit "parallel ab Phase-0 implementierbar" per ISA und ist die einzige Schutz vor "ich hab vergessen wie das Setup ging"-Erlebnis bei Fresh-Server-Deploy. Plus: idempotency-Garantie für install macht .env.local-Drift unmöglich, sobald sie einmal real wird.
+  - **learned**: Single-File Bun-Script reicht für MVP — 350 LoC für saubere UX, Secret-Generierung, idempotent prompt-only-for-missing, polling-Healthcheck mit Timeout. Live-getestet zweimal, keine Drift. Phase-9 macht zukünftige Server-Migrations zu einer One-Liner.
+  - **criterion_now**: ISC-67/68/69 alle done. Progress 8→11/81. Phase-9 ist ein Track-Closure — Phase-1 kann jetzt ohne weiteres Tooling-Risk starten weil der Operator-Onboarding-Pfad bekannt ist.
+
 - **2026-05-16T12:45:00Z** — Phase-0.5 Sprint fortgesetzt — ADR-005 (Auth) + ADR-006 (Validation-Location) committed
   - **conjectured**: Auth zwischen Agents und lokyy-brain könnte mit einem geteilten static API-Key gelöst werden; Frontmatter-Validation kann zur Bequemlichkeit auch in Adaptern leben weil Brain's pre-commit-hook am Ende eh validiert.
   - **refuted_by**: (a) Ein static API-Key vereitelt Audit + Scope-Enforcement; ohne `sub`-Claim wissen wir nicht welcher Agent geschrieben hat. (b) Wenn Adapter Frontmatter konstruieren, ist Brain's Schema in zwei Codepfaden — drift garantiert. Advisor: "single biggest contract-leak risk".
@@ -354,3 +360,9 @@ During live deploy, two issues were discovered and fixed:
 - [x] **ISC-62** — `docs/decisions/ADR-005-service-auth-and-audit.md` defines stateless JWT HS256 signed by lokyy-os-be and verified by lokyy-brain. `sub` claim maps to `mcp-scopes.yaml` entries. Audit log at `mcp-audit.jsonl` with `{ts, agent_id, action, target_type, target_id, status, duration_ms}`; never logs body or token content. Bootstrap via `lokyy-installer` generating `LOKYY_AGENT_JWT_SECRET`.
 - [ ] **ISC-47** — Still pending: stub MCP server implementation in lokyy-brain repo (coordination with brain-repo maintainer required).
 - [ ] **ISC-63** — Still pending: Phase-1-start antecedent (#79 still open; brain-repo work).
+
+### Phase-9 (Install Wizard) — Winston, 2026-05-16
+
+- [x] **ISC-67** — `cli/lokyy-installer.ts` exists as a single-file Bun script. Five commands implemented: `install`, `up`, `down`, `purge`, `status`. `help` listed each in colored output; unknown command yields exit 2 + help.
+- [x] **ISC-68** — Idempotent confirmed by two consecutive `install` runs against the live stack. Run 1 detected existing values in `.env.local`, generated missing `LOKYY_AGENT_JWT_SECRET`, wrote file (chmod 0600), recreated Traefik (env diff), all 5 services healthy. Run 2 detected all values present, no regeneration, no container churn, all healthy. End-state identical.
+- [x] **ISC-69** — `cmdInstall` polls `docker compose ps --format json` every 2s, parses per-service state and health, exits 0 only when all 5 expected services match `state=running` AND (no health field OR `health=healthy`). Timeout default 90s → exit 3 with status dump. Verified on local stack.
