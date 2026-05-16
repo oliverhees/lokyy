@@ -284,6 +284,12 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Changelog
 
+- **2026-05-16T14:00:00Z** — Phase-1 Foundation-Scaffold live — FE + BE bauen aus Repo, sprechen via Traefik
+  - **conjectured**: Phase-1 scaffold könnte minimal sein (nginx serving plain HTML), Logik kommt erst mit Auth in Phase-1b.
+  - **refuted_by**: Visibility-First-Doctrine sagt User soll von Tag-1 sehen wie das System lebt. Plus: ein Scaffold der das echte FE-zu-BE-Routing demonstriert (React fetcht /api/version, rendert Response) ist die natürliche Foundation für Auth-Flow in Phase-1b — wir hätten den HTTP-Plumbing-Loop sonst zweimal gebaut.
+  - **learned**: Scaffold liefert mehr Wert wenn er einen End-to-End-Loop demonstriert (React → Traefik → Hono → JSON → rendered DOM). Tech-Stack-Choice (Vite+React+Tailwind / Bun+Hono) in ADR-007 dokumentiert; bewusst nicht TanStack-Start weil Lokyy ein dünner Gateway-Layer ist (vgl. Hermes-insight ADR-001). busybox-wget IPv6-Gotcha entdeckt + dokumentiert für künftige Healthchecks.
+  - **criterion_now**: Phase-1 Scaffold steht (ADR-007 + lokyy-os-fe/ + lokyy-os-be/), Stack 5/5 healthy nach echtem Build (nicht mehr nginx:alpine-Placeholder), Playwright-Evidence in docs/evidence/phase-1/. ISC-1 + ISC-2 + ISC-39 bleiben offen für Phase-1b (Auth) und Phase-1c (Dashboard).
+
 - **2026-05-16T13:30:00Z** — Phase-9 abgeschlossen — lokyy-installer CLI live + idempotency verifiziert
   - **conjectured**: Install-Wizard ist Tooling, kann später kommen wenn Phase-1+ existiert; bis dahin docker compose direkt aufrufen reicht.
   - **refuted_by**: Phase-9 ist explizit "parallel ab Phase-0 implementierbar" per ISA und ist die einzige Schutz vor "ich hab vergessen wie das Setup ging"-Erlebnis bei Fresh-Server-Deploy. Plus: idempotency-Garantie für install macht .env.local-Drift unmöglich, sobald sie einmal real wird.
@@ -366,3 +372,12 @@ During live deploy, two issues were discovered and fixed:
 - [x] **ISC-67** — `cli/lokyy-installer.ts` exists as a single-file Bun script. Five commands implemented: `install`, `up`, `down`, `purge`, `status`. `help` listed each in colored output; unknown command yields exit 2 + help.
 - [x] **ISC-68** — Idempotent confirmed by two consecutive `install` runs against the live stack. Run 1 detected existing values in `.env.local`, generated missing `LOKYY_AGENT_JWT_SECRET`, wrote file (chmod 0600), recreated Traefik (env diff), all 5 services healthy. Run 2 detected all values present, no regeneration, no container churn, all healthy. End-state identical.
 - [x] **ISC-69** — `cmdInstall` polls `docker compose ps --format json` every 2s, parses per-service state and health, exits 0 only when all 5 expected services match `state=running` AND (no health field OR `health=healthy`). Timeout default 90s → exit 3 with status dump. Verified on local stack.
+
+### Phase-1 (Foundation Scaffold) — Winston, 2026-05-16
+
+- **`lokyy-os-fe/`** scaffolded: Vite 6 + React 19 + TypeScript strict + Tailwind 4 (`@tailwindcss/vite` plugin). Multi-stage Dockerfile (Bun build → nginx:alpine serve). Healthcheck on 127.0.0.1 (busybox-wget no-IPv6-fallback gotcha noted).
+- **`lokyy-os-be/`** scaffolded: Bun + Hono + TypeScript strict. Routes: `/health`, `/api/version`, JSON 404 catch-all. Single-stage Dockerfile, healthcheck via `bun -e fetch`.
+- **Compose** updated — both services switched from `nginx:alpine` placeholders to `build: { context: ../lokyy-os-{fe,be} }`. Stack remains 5 services, all healthy.
+- **End-to-end verified** via Playwright (`scripts/verify-phase-1.ts`, 2/2 passed): `https://lokyy.local/` renders the React app (gradient title, description), which fetches `/api/version`, receives `{service:"lokyy-os-be",version:"0.1.0",phase:"Phase-1 scaffold"}`, and renders it inline. Screenshots in `docs/evidence/phase-1/`.
+- **ADR-007** documents the tech-stack decision (Vite+React vs TanStack Start; Bun+Hono vs Express).
+- **Open for Phase-1 completion**: ISC-1 (real auth flow with Better-Auth, mirrors ADR-002 pattern), ISC-2 (dashboard rendering user state + agent list), ISC-39 (phase-plan markdown files per phase under `docs/phases/`). The `docs/evidence/phase-N/` pattern is now established and used for phase-0 and phase-1.
