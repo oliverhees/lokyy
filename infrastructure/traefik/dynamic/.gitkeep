@@ -1,0 +1,4 @@
+# Placeholder so the directory exists in git and is mountable by Traefik.
+# Dynamic middleware / router files (yml) added here are auto-loaded
+# when ../traefik.yml has a file provider pointing at this directory.
+# Phase-0 declares all routes via Docker labels, so no files needed yet.

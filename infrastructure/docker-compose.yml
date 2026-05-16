@@ -1,0 +1,229 @@
+# Lokyy KI-OS — Production Docker Stack (Etappe-2)
+#
+# See ADR-003-docker-topology-etappe-2.md for the architecture record.
+# See infrastructure/README.md for the operator runbook.
+# See ../ISA.md for the full Lokyy KI-OS architecture and ISC criteria.
+#
+# Phase-0 deliverable: Traefik + Forgejo + service placeholders, all healthy.
+
+name: lokyy
+
+networks:
+  lokyy-net:
+    name: lokyy-net
+    driver: bridge
+  traefik-public:
+    name: traefik-public
+    driver: bridge
+
+volumes:
+  traefik-letsencrypt:
+    name: lokyy-traefik-letsencrypt
+  forgejo-data:
+    name: lokyy-forgejo-data
+  forgejo-config:
+    name: lokyy-forgejo-config
+  # Reserved for future phases (uncomment when activating the phase):
+  # lokyy-brain-vault:    # Phase-3 — lokyy-brain Forgejo working copy
+  #   name: lokyy-brain-vault
+  # lokyy-os-db:          # Phase-1 — Auth-DB + activity-log SQLite
+  #   name: lokyy-os-db
+  # hermes-data:          # Phase-2 — Hermes state + skills
+  #   name: lokyy-hermes-data
+  # heartbeat-state:      # Phase-2 — Lokyy-Heartbeat-Supervisor state
+  #   name: lokyy-heartbeat-state
+
+services:
+  # =====================================================================
+  # Traefik — reverse-proxy, auto-TLS, dashboard
+  # =====================================================================
+  traefik:
+    image: traefik:v3.2
+    container_name: lokyy-traefik
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - lokyy-net
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - traefik-letsencrypt:/letsencrypt
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      # Dashboard router — subdomain, basic-auth protected
+      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+      # Basic-auth middleware (htpasswd hash from .env.local)
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+
+  # =====================================================================
+  # Forgejo — git server (Second-Brain storage backend)
+  # =====================================================================
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:9
+    container_name: lokyy-forgejo
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - FORGEJO__database__DB_TYPE=sqlite3
+      - FORGEJO__server__ROOT_URL=https://${FORGEJO_HOST}/
+    volumes:
+      - forgejo-data:/var/lib/gitea
+      - forgejo-config:/etc/gitea
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/v1/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.forgejo.rule=Host(`${FORGEJO_HOST}`)"
+      - "traefik.http.routers.forgejo.entrypoints=websecure"
+      - "traefik.http.routers.forgejo.tls=true"
+      - "traefik.http.routers.forgejo.tls.certresolver=letsencrypt"
+      - "traefik.http.services.forgejo.loadbalancer.server.port=3000"
+
+  # =====================================================================
+  # Lokyy OS Frontend (Phase-0 placeholder → Phase-1 real build)
+  # =====================================================================
+  lokyy-os-fe:
+    image: nginx:alpine
+    container_name: lokyy-os-fe
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lokyy-os-fe.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.lokyy-os-fe.entrypoints=websecure"
+      - "traefik.http.routers.lokyy-os-fe.tls=true"
+      - "traefik.http.routers.lokyy-os-fe.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.lokyy-os-fe.priority=1"
+      - "traefik.http.services.lokyy-os-fe.loadbalancer.server.port=80"
+    # PHASE-1 NOTE: replace `image:` with `build: { context: ../lokyy-os-fe }`
+    # PHASE-1 NOTE: add `depends_on: [lokyy-os-be]` once backend is real
+
+  # =====================================================================
+  # Lokyy OS Backend (Phase-0 placeholder → Phase-1 real Auth-Gateway)
+  # =====================================================================
+  lokyy-os-be:
+    image: traefik/whoami:latest
+    container_name: lokyy-os-be
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lokyy-os-be.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.lokyy-os-be.entrypoints=websecure"
+      - "traefik.http.routers.lokyy-os-be.tls=true"
+      - "traefik.http.routers.lokyy-os-be.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.lokyy-os-be.priority=10"
+      - "traefik.http.services.lokyy-os-be.loadbalancer.server.port=80"
+    # PHASE-1 NOTE: replace `image:` with `build: { context: ../lokyy-os-be }`
+    # PHASE-1 NOTE: mount PAI Telos read-only (ISC-10, ISC-29):
+    #   volumes:
+    #     - ${HOME}/.claude/PAI/USER/TELOS:/telos:ro
+    # PHASE-3 NOTE: declare BrainAdapter env vars:
+    #   environment:
+    #     - LOKYY_BRAIN_BASE_URL=http://lokyy-brain:8787
+
+  # =====================================================================
+  # Lokyy Brain (placeholder; real image from separate repo in Phase-3)
+  # ⚠ ISC-44: lokyy-brain is NOT publicly exposed.
+  #   No Traefik labels — only reachable internally on lokyy-net.
+  # =====================================================================
+  lokyy-brain:
+    image: traefik/whoami:latest
+    container_name: lokyy-brain
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    # PHASE-3 NOTE: replace with actual lokyy-brain image (separate repo, still in dev).
+    # PHASE-3 NOTE: env from .env.local:
+    #   environment:
+    #     - GIT_REMOTE=http://forgejo:3000/${FORGEJO_ADMIN_USER}/lokyy-vault.git
+    #     - SUPADATA_API_KEY=${SUPADATA_API_KEY}
+    #     - VAULT_DIR=/vault
+    #   volumes:
+    #     - lokyy-brain-vault:/vault
+
+  # =====================================================================
+  # PHASE-2: Hermes Agent (nousresearch/hermes-agent, MIT)
+  # =====================================================================
+  # hermes:
+  #   image: nousresearch/hermes-agent:latest
+  #   container_name: lokyy-hermes
+  #   restart: unless-stopped
+  #   networks:
+  #     - lokyy-net
+  #   environment:
+  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #   volumes:
+  #     - hermes-data:/data
+  #     - ${HOME}/.claude/PAI/USER/TELOS:/telos:ro
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -fsS http://localhost:8642/health || exit 1"]
+  #     interval: 15s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 30s
+
+  # =====================================================================
+  # PHASE-2: Lokyy Heartbeat Supervisor (Layer-3 watchdog)
+  # =====================================================================
+  # lokyy-heartbeat-supervisor:
+  #   build:
+  #     context: ../lokyy-heartbeat-supervisor
+  #   container_name: lokyy-heartbeat-supervisor
+  #   restart: unless-stopped
+  #   networks:
+  #     - lokyy-net
+  #   environment:
+  #     - TICK_INTERVAL_SECONDS=60
+  #     - HERMES_HEALTH_URL=http://hermes:8642/health
+  #     - LOKYY_OS_BE_URL=http://lokyy-os-be/api/internal
+  #   volumes:
+  #     - heartbeat-state:/state
+  #     # PHASE-8: switch to docker-socket-proxy for hardened access
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   depends_on:
+  #     - hermes

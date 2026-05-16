@@ -1,0 +1,44 @@
+# Lokyy Traefik — static configuration
+#
+# Reference: ADR-003-docker-topology-etappe-2.md
+# Dynamic routes + middlewares are declared as Docker labels on the services they affect.
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: true
+  insecure: false   # dashboard is exposed only through router with basic-auth middleware
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: lokyy-net
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "${ACME_EMAIL}"
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+log:
+  level: INFO
+
+ping:
+  entryPoint: web

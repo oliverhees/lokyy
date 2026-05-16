@@ -302,4 +302,11 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Verification
 
-(empty — plan-means-stop active; keine Execution bis User-Freigabe)
+### Phase-0 (Docker Foundation) — Winston, 2026-05-16
+
+- **ISC-41** [DEFERRED-VERIFY] — `infrastructure/docker-compose.yml` declares all five active services (`traefik`, `forgejo`, `lokyy-os-fe`, `lokyy-os-be`, `lokyy-brain`) on `lokyy-net`. Compose config validates in both prod and dev mode (`docker compose config` → PROD-VALID + DEV-VALID). Live `docker compose up -d` + `docker compose ps` healthy state requires user-run on the target server; tracked in GitHub Issue #77.
+- **ISC-44** [DEFERRED-VERIFY] — `lokyy-brain` service block in `infrastructure/docker-compose.yml` has zero `traefik.*` labels and no `ports:` mapping; verified by code-read. Live external-curl-timeout verification deferred to runtime, tracked in Issue #77.
+- **ISC-54** [DEFERRED-VERIFY] — `infrastructure/docker-compose.yml` contains zero plaintext secrets; all credentials are `${VAR}` references resolved from `.env.local` (which is gitignored). `.env.example` documents every variable with `REPLACE_ME` placeholders. Live `.env.local` chmod 0600 verification deferred to user-run, tracked in Issue #77.
+- **ISC-72** [DEFERRED-VERIFY] — Traefik static config (`infrastructure/traefik/traefik.yml`) declares HTTP-01 Let's Encrypt resolver + Docker provider. Service labels declare TLS-router for `traefik.${DOMAIN}` with `basicauth` middleware reading `${TRAEFIK_DASHBOARD_AUTH}`. Live cert acquisition + Playwright dashboard screenshot deferred to runtime, tracked in Issue #77.
+
+**Phase-0 artefact-level acceptance**: ✅ done. Phase-0 runtime-level acceptance (live deploy + Playwright screenshot): tracked in Issue #77 until user brings the stack up on a host with the required `/etc/hosts` entries and real `.env.local`.
