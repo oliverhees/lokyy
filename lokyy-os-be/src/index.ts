@@ -4,6 +4,9 @@ import { cors } from "hono/cors";
 import { auth } from "./auth.ts";
 import { lokyyStubs } from "./api/lokyy-stubs.ts";
 import { hermesStubs } from "./api/hermes-stubs.ts";
+import { conversations } from "./api/conversations.ts";
+import { auth as authMod } from "./auth.ts";
+import type { MiddlewareHandler } from "hono";
 
 const app = new Hono();
 
@@ -98,6 +101,19 @@ app.get("/api/setup-needed", async (c) => {
   const n = await countUsers();
   return c.json({ setupNeeded: n === 0 });
 });
+
+// Real chat-conversation storage (Phase-2c). File-backed under /app/data;
+// auth-guarded with the same middleware as the rest of /api/lokyy/*.
+// MUST be registered BEFORE /api/lokyy so the more-specific path matches first.
+const requireAuth: MiddlewareHandler = async (c, next) => {
+  const session = await authMod.api.getSession({ headers: c.req.raw.headers });
+  if (!session?.user) return c.json({ error: "unauthenticated" }, 401);
+  await next();
+};
+const convoApp = new Hono();
+convoApp.use("*", requireAuth);
+convoApp.route("/", conversations);
+app.route("/api/lokyy/conversations", convoApp);
 
 // Phase-1d stub endpoints — sidebar routes call these on mount.
 // Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).

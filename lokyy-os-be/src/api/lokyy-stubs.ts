@@ -119,13 +119,8 @@ lokyyStubs.get("/sessions", async (c) => {
   return c.json({ sessions: r.data.sessions ?? [], live: r.live, error: r.error });
 });
 
-lokyyStubs.get("/conversations", (c) =>
-  c.json({ conversations: [] })
-);
-
-lokyyStubs.get("/conversations/:id", (c) =>
-  c.json({ id: c.req.param("id"), messages: [], title: "(stub)" })
-);
+// /conversations/* moved to its own router in src/api/conversations.ts
+// (mounted directly in index.ts so it takes precedence over this sub-app).
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Prompts / Teams / Workflows / Integrations
