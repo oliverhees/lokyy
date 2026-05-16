@@ -42,8 +42,9 @@ function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl">Login</CardTitle>
+        <CardHeader className="space-y-2 text-center">
+          <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-fuchsia-400 bg-clip-text text-transparent">Lokyy</h1>
+          <CardTitle className="text-base font-normal text-muted-foreground">Sign in</CardTitle>
           <CardDescription>Melde dich in deinem Lokyy-Konto an.</CardDescription>
         </CardHeader>
         <CardContent>
