@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { auth } from "./auth.ts";
+import { lokyyStubs } from "./api/lokyy-stubs.ts";
+import { hermesStubs } from "./api/hermes-stubs.ts";
 
 const app = new Hono();
 
@@ -33,8 +35,8 @@ app.get("/health", (c) => c.text("OK", 200));
 app.get("/api/version", (c) =>
   c.json({
     service: "lokyy-os-be",
-    version: "0.2.0",
-    phase: "Phase-1b auth",
+    version: "0.3.0",
+    phase: "Phase-1d api stubs",
   })
 );
 
@@ -96,6 +98,11 @@ app.get("/api/setup-needed", async (c) => {
   const n = await countUsers();
   return c.json({ setupNeeded: n === 0 });
 });
+
+// Phase-1d stub endpoints — sidebar routes call these on mount.
+// Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).
+app.route("/api/lokyy", lokyyStubs);
+app.route("/api/hermes", hermesStubs);
 
 app.notFound((c) =>
   c.json({ error: "not_found", path: c.req.path }, 404)

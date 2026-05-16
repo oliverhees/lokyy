@@ -284,6 +284,12 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Changelog
 
+- **2026-05-16T17:00:00Z** — Phase-1d API-Stubs — alle Sidebar-Routen klickbar
+  - **conjectured**: Generic empty-array stubs reichen aus, FE-Routes rendern dann sinnvolle "leere Listen"-Zustände.
+  - **refuted_by**: React crashes mit "Cannot read .map of undefined" wenn die Response-Shape nicht exakt zur TypeScript-Typ-Definition passt (`MemoryStatus`, `InsightsData`, `VaultListResponse` waren in meinem ersten Wurf falsch geformt). FE arbeitet shape-strict.
+  - **learned**: Stub-Endpoints für eine TypeScript-FE müssen *exakt* die Type-Schemas matchen — empty arrays alleine reichen nicht. Source-of-truth ist `src/lib/lokyy-hermes.ts` + `src/lib/lokyy-vault.ts`; jeden Stub gegen diese Type-Defs spiegeln spart drei Iterations-Runden.
+  - **criterion_now**: 20/20 Sidebar-Routes clean. lokyy-os-be v0.3.0 (Phase-1d). Neue Files `lokyy-os-be/src/api/{lokyy-stubs,hermes-stubs}.ts`. `requireAuth` Middleware schützt alle Lokyy-Stubs. /api/hermes/* gibt 503 mit Phase-2-Note statt TCP-Error.
+
 - **2026-05-16T15:30:00Z** — Phase-1c FE-Switch + Gradient-Brand — `lokyy-app` adoptiert, `lokyy-os-fe` retired
   - **conjectured**: Phase-1-Foundation-Scaffold und Phase-1b-Auth in `lokyy-os-fe` (heute morgen scaffolded) sind die Etappe-2-FE-Basis; Dashboard mit Sidebar kommt im nächsten Schritt.
   - **refuted_by**: Oliver wies darauf hin dass `lokyy-app/` bereits seit Tagen die echte Etappe-2-Greenfield-FE ist (TanStack Router SPA, 22 Routes, Sidebar mit allen Sections, shadcn-components, Better-Auth-integration). `lokyy-app/package.json` sagt explizit *"Greenfield-Frontend gegen Hermes-Gateway (Etappe 2, see ADR-001)"*. Das heutige `lokyy-os-fe` war eine duplicate-work-Situation weil ich `lokyy-app/` nicht zuerst durchsucht hatte.
@@ -384,6 +390,14 @@ During live deploy, two issues were discovered and fixed:
 - [x] **ISC-67** — `cli/lokyy-installer.ts` exists as a single-file Bun script. Five commands implemented: `install`, `up`, `down`, `purge`, `status`. `help` listed each in colored output; unknown command yields exit 2 + help.
 - [x] **ISC-68** — Idempotent confirmed by two consecutive `install` runs against the live stack. Run 1 detected existing values in `.env.local`, generated missing `LOKYY_AGENT_JWT_SECRET`, wrote file (chmod 0600), recreated Traefik (env diff), all 5 services healthy. Run 2 detected all values present, no regeneration, no container churn, all healthy. End-state identical.
 - [x] **ISC-69** — `cmdInstall` polls `docker compose ps --format json` every 2s, parses per-service state and health, exits 0 only when all 5 expected services match `state=running` AND (no health field OR `health=healthy`). Timeout default 90s → exit 3 with status dump. Verified on local stack.
+
+### Phase-1d (API Stubs) — Winston, 2026-05-16
+
+- Alle Sidebar-Routen in lokyy-app (20 Stück) klickbar **ohne Console-Errors oder 404**.
+- Neue Files: `lokyy-os-be/src/api/lokyy-stubs.ts` (Hono-Sub-Router mit auth-guard middleware, deckt `/agents`, `/agents/:id/{skills,mcps,…toggle}`, `/tasks`, `/jobs` (GET+POST), `/sessions`, `/conversations`, `/prompts`, `/teams`, `/workflows`, `/integrations`, `/settings` (GET+POST), `/vault` (mit `?action=read|list`), plus `/hermes-{memory,channels,tools,plugins,webhooks,insights,logs,curator,doctor,backup}`) und `lokyy-os-be/src/api/hermes-stubs.ts` (returnt 503 mit klarer Phase-2-Botschaft für `/api/hermes/*`).
+- Response-Shapes treffen exakt das was lokyy-app's TypeScript-Types (`lokyy-hermes.ts`, `lokyy-vault.ts`) erwarten — sonst crasht React beim Lesen einer undefined Property. Drei Round-Trips: Initial-Shape → "Cannot read .map" → MemoryStatus + InsightsData + Vault-Response korrekt nachmodelliert.
+- Verifikation: `scripts/verify-phase-1d.ts` walked alle 20 Routes mit Console-Error-Listener; **20/20 clean**. Screenshots in `docs/evidence/phase-1d/`.
+- Stubs persistieren noch nichts. POST endpoints echo + 200, GET endpoints leere Listen / sinnvolle Defaults. Echte Daten kommen in Phase-2 (Hermes) / Phase-3 (brain).
 
 ### Phase-1c (FE-Switch + Brand) — Winston, 2026-05-16
 
