@@ -97,16 +97,20 @@ services:
   # =====================================================================
 
   # =====================================================================
-  # Lokyy OS Frontend (Phase-0 placeholder → Phase-1 real build)
+  # Lokyy OS Frontend (Phase-1: Vite + React 19 + TS + Tailwind 4)
   # =====================================================================
   lokyy-os-fe:
-    image: nginx:alpine
+    build:
+      context: ../lokyy-os-fe
     container_name: lokyy-os-fe
     restart: unless-stopped
     networks:
       - lokyy-net
+    depends_on:
+      - lokyy-os-be
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://localhost/ || exit 1"]
+      # busybox-wget tries IPv6 (::1) first and won't fall back to IPv4 — use 127.0.0.1 explicitly.
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -119,22 +123,19 @@ services:
       - "traefik.http.routers.lokyy-os-fe.tls.certresolver=letsencrypt"
       - "traefik.http.routers.lokyy-os-fe.priority=1"
       - "traefik.http.services.lokyy-os-fe.loadbalancer.server.port=80"
-    # PHASE-1 NOTE: replace `image:` with `build: { context: ../lokyy-os-fe }`
-    # PHASE-1 NOTE: add `depends_on: [lokyy-os-be]` once backend is real
 
   # =====================================================================
-  # Lokyy OS Backend (Phase-0 placeholder → Phase-1 real Auth-Gateway)
-  # PHASE-0 NOTE: nginx:alpine used as a placeholder (real image in Phase-1).
-  # traefik/whoami would be informative but lacks wget/sh for healthchecks.
+  # Lokyy OS Backend (Phase-1: Bun + Hono)
   # =====================================================================
   lokyy-os-be:
-    image: nginx:alpine
+    build:
+      context: ../lokyy-os-be
     container_name: lokyy-os-be
     restart: unless-stopped
     networks:
       - lokyy-net
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://localhost/ || exit 1"]
+      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -147,8 +148,7 @@ services:
       - "traefik.http.routers.lokyy-os-be.tls.certresolver=letsencrypt"
       - "traefik.http.routers.lokyy-os-be.priority=10"
       - "traefik.http.services.lokyy-os-be.loadbalancer.server.port=80"
-    # PHASE-1 NOTE: replace `image:` with `build: { context: ../lokyy-os-be }`
-    # PHASE-1 NOTE: mount PAI Telos read-only (ISC-10, ISC-29):
+    # PHASE-3 NOTE: mount PAI Telos read-only (ISC-10, ISC-29):
     #   volumes:
     #     - ${HOME}/.claude/PAI/USER/TELOS:/telos:ro
     # PHASE-3 NOTE: declare BrainAdapter env vars:
