@@ -59,9 +59,14 @@
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.522.0",
+    "marked": "^15.0.0",
     "motion": "^12.23.26",
     "next-themes": "^0.4.6",
+    "react-markdown": "^9.0.0",
+    "remark-gfm": "^4.0.0",
+    "shiki": "^1.24.0",
     "radix-ui": "^1.4.3",
     "react": "^19.0.0",
     "react-day-picker": "^9.14.0",
@@ -89,8 +94,10 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@tailwindcss/oxide",
       "better-sqlite3",
-      "esbuild"
+      "esbuild",
+      "unrs-resolver"
     ]
   }
 }
