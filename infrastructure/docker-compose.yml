@@ -19,6 +19,8 @@ networks:
 volumes:
   traefik-letsencrypt:
     name: lokyy-traefik-letsencrypt
+  lokyy-os-db:
+    name: lokyy-os-db
   # Reserved for future phases (uncomment when activating the phase):
   # lokyy-brain-vault:    # Phase-3 — lokyy-brain Forgejo working copy
   #   name: lokyy-brain-vault
@@ -125,7 +127,7 @@ services:
       - "traefik.http.services.lokyy-os-fe.loadbalancer.server.port=80"
 
   # =====================================================================
-  # Lokyy OS Backend (Phase-1: Bun + Hono)
+  # Lokyy OS Backend (Phase-1b: Bun + Hono + Better-Auth + SQLite)
   # =====================================================================
   lokyy-os-be:
     build:
@@ -134,12 +136,18 @@ services:
     restart: unless-stopped
     networks:
       - lokyy-net
+    volumes:
+      - lokyy-os-db:/app/data
+    environment:
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - AUTH_BASE_URL=https://${DOMAIN}
+      - AUTH_TRUSTED_ORIGINS=https://${DOMAIN}
     healthcheck:
-      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.lokyy-os-be.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"

@@ -1,31 +1,93 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
+import { auth } from "./auth.ts";
 
 const app = new Hono();
 
 app.use("*", logger());
-app.use("*", cors({ origin: (origin) => origin ?? "*" }));
 
-// Health probe used by Docker healthcheck and the Lokyy supervisor (Phase-2).
-app.get("/health", (c) => c.text("OK", 200));
-
-// Version/identity endpoint — Phase-1 frontend calls this on first paint.
-app.get("/api/version", (c) =>
-  c.json({
-    service: "lokyy-os-be",
-    version: "0.1.0",
-    phase: "Phase-1 scaffold",
+// CORS: trust the lokyy frontend origin; credentialed so cookies flow.
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      const trusted = (process.env.AUTH_TRUSTED_ORIGINS ?? "https://lokyy.local")
+        .split(",")
+        .map((s) => s.trim());
+      if (!origin) return trusted[0] ?? "https://lokyy.local";
+      return trusted.includes(origin) ? origin : "";
+    },
+    credentials: true,
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization", "Cookie"],
   })
 );
 
-// Default catch-all for unmatched /api/* paths.
+// ─────────────────────────────────────────────────────────────────────────────
+// Public health + version endpoints
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.get("/health", (c) => c.text("OK", 200));
+
+app.get("/api/version", (c) =>
+  c.json({
+    service: "lokyy-os-be",
+    version: "0.2.0",
+    phase: "Phase-1b auth",
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Better-Auth handler — mounts /api/auth/* (sign-in, sign-up, sign-out, …)
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Application endpoints (guarded)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * /api/me — returns the authenticated user, or 401.
+ */
+app.get("/api/me", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session?.user) {
+    return c.json({ error: "unauthenticated" }, 401);
+  }
+  return c.json({
+    user: {
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
+      image: session.user.image ?? null,
+      createdAt: session.user.createdAt,
+    },
+  });
+});
+
+/**
+ * /api/setup-needed — true if no user exists yet (first-run).
+ * Used by the frontend to decide whether to redirect to /setup or /login.
+ */
+app.get("/api/setup-needed", async (c) => {
+  // Reach into the Kysely instance behind better-auth to count users.
+  const k = (auth.options.database as any).db as any;
+  const { count } = (await k
+    .selectFrom("user")
+    .select((eb: any) => eb.fn.countAll().as("count"))
+    .executeTakeFirst()) as { count: number | bigint };
+  const n = typeof count === "bigint" ? Number(count) : count;
+  return c.json({ setupNeeded: n === 0 });
+});
+
 app.notFound((c) =>
   c.json({ error: "not_found", path: c.req.path }, 404)
 );
 
 const port = Number(process.env.PORT ?? 80);
-console.log(`lokyy-os-be listening on :${port}`);
+console.log(`lokyy-os-be (Phase-1b) listening on :${port}`);
 
 export default {
   port,

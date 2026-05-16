@@ -4,7 +4,7 @@ task: Lokyy KI-Betriebssystem — Architektur-Design
 slug: lokyy-kios-design
 effort: E3
 phase: plan
-progress: 11/81
+progress: 12/81
 mode: design
 started: 2026-05-16
 updated: 2026-05-16
@@ -82,7 +82,7 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Criteria
 
-- [ ] ISC-1: Auth-Flow (Login/Logout/Session-Refresh) per Playwright E2E grün
+- [x] ISC-1: Auth-Flow (Login/Logout/Session-Refresh) per Playwright E2E grün — `scripts/verify-phase-1b.ts` 3/3 passed (root→/login redirect, login→dashboard with user email, sign-out→/login)
 - [ ] ISC-2: Dashboard rendert User-State + Liste aktiver Agenten auf Erst-Login
 - [ ] ISC-3: Hermes Agent als Core in Lokyy-Backend eingebunden und HTTP-pingbar
 - [ ] ISC-4: Hermes-Self-Learning + autonomous-skill-creation aktiviert + Skill-Output ist im Lokyy-Audit-Log sichtbar
@@ -284,6 +284,12 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Changelog
 
+- **2026-05-16T14:30:00Z** — Phase-1b Auth-Flow live — Better-Auth + SQLite + Login/Dashboard/Sign-out
+  - **conjectured**: Better-Auth läuft Out-of-the-Box mit better-sqlite3 (per ADR-002 Etappe-1-Pattern); `bunx @better-auth/cli migrate` macht Schema-Setup im Container.
+  - **refuted_by**: (a) `better-sqlite3` ist in Bun nicht unterstützt (ERR_DLOPEN_FAILED, GitHub Issue 4290) — wir mussten auf `bun:sqlite` + Kysely (BunSqliteDialect) wechseln. (b) Der Migrator-CLI hängt in Bun's non-TTY Docker-Kontext auch mit `-y` flag — schema-bootstrap muss inline mit `db.exec()` passieren. (c) SPA-`navigate("/")` nach Sign-in racet das Cookie-Write — useSession rendert stale-null und Root redirected zurück zu /login. Hard-Reload `window.location.assign("/")` löst es deterministisch.
+  - **learned**: Better-Auth + Bun braucht spezifisches Setup (Kysely + bun:sqlite, kein better-sqlite3, kein migrator-CLI). Auth-Cookie-Race in SPA-Patterns ist ein bekanntes Muster — Hard-Reload nach Login/Setup ist die robusteste Lösung. Schema-Apply-on-Boot mit `CREATE IF NOT EXISTS` ist idempotent und CLI-frei.
+  - **criterion_now**: ISC-1 als done markiert (Playwright 3/3 grün). Progress 11→12/81. lokyy-os-be auf Phase-1b (v0.2.0): Better-Auth 1.2, bun:sqlite, Kysely. lokyy-os-fe auf Phase-1b (v0.2.0): React Router 7, better-auth/react, drei Pages (Login, Setup, Dashboard). Compose-Volume `lokyy-os-db` (Phase-3-reserved-list aktiviert). Installer generiert BETTER_AUTH_SECRET. ISC-2 (Dashboard mit Agent-Liste) bleibt offen für Phase-1c.
+
 - **2026-05-16T14:00:00Z** — Phase-1 Foundation-Scaffold live — FE + BE bauen aus Repo, sprechen via Traefik
   - **conjectured**: Phase-1 scaffold könnte minimal sein (nginx serving plain HTML), Logik kommt erst mit Auth in Phase-1b.
   - **refuted_by**: Visibility-First-Doctrine sagt User soll von Tag-1 sehen wie das System lebt. Plus: ein Scaffold der das echte FE-zu-BE-Routing demonstriert (React fetcht /api/version, rendert Response) ist die natürliche Foundation für Auth-Flow in Phase-1b — wir hätten den HTTP-Plumbing-Loop sonst zweimal gebaut.
@@ -372,6 +378,19 @@ During live deploy, two issues were discovered and fixed:
 - [x] **ISC-67** — `cli/lokyy-installer.ts` exists as a single-file Bun script. Five commands implemented: `install`, `up`, `down`, `purge`, `status`. `help` listed each in colored output; unknown command yields exit 2 + help.
 - [x] **ISC-68** — Idempotent confirmed by two consecutive `install` runs against the live stack. Run 1 detected existing values in `.env.local`, generated missing `LOKYY_AGENT_JWT_SECRET`, wrote file (chmod 0600), recreated Traefik (env diff), all 5 services healthy. Run 2 detected all values present, no regeneration, no container churn, all healthy. End-state identical.
 - [x] **ISC-69** — `cmdInstall` polls `docker compose ps --format json` every 2s, parses per-service state and health, exits 0 only when all 5 expected services match `state=running` AND (no health field OR `health=healthy`). Timeout default 90s → exit 3 with status dump. Verified on local stack.
+
+### Phase-1b (Auth Flow) — Winston, 2026-05-16
+
+- [x] **ISC-1** — End-to-end auth flow verified live: `bun run scripts/verify-phase-1b.ts` → 3/3 passed.
+  - Step 1: `https://lokyy.local/` redirects to `/login` when a user exists but no session is present.
+  - Step 2: login form submit → server sets `__Secure-better-auth.session_token` cookie (Secure+SameSite=lax+httpOnly) → hard reload → Root sees session → renders Dashboard with user email + name.
+  - Step 3: Sign-out button → session cleared → back to `/login`.
+- Backend: Better-Auth 1.2 on Bun + Hono + bun:sqlite + Kysely. Schema bootstrapped via inline `db.exec()` (idempotent `CREATE TABLE IF NOT EXISTS`) in `lokyy-os-be/src/auth.ts` — the `@better-auth/cli` migrator hangs in Bun's non-TTY Docker context, so direct schema application is the pragmatic choice. Organization plugin loaded but unused (keeps SaaS migration path open per ADR-002 pattern).
+- Frontend: React Router 7 SPA with Root/Login/Setup/Dashboard pages. `better-auth/react` client (`createAuthClient`) provides `signIn`, `signUp`, `signOut`, `useSession`. After mutations, the app does a hard `window.location.assign("/")` so `useSession` re-reads the freshly-set cookie deterministically (SPA-navigate races the cookie-write).
+- Compose: new `lokyy-os-db` named volume mounted at `/app/data` in lokyy-os-be; new env vars `BETTER_AUTH_SECRET`, `AUTH_BASE_URL`, `AUTH_TRUSTED_ORIGINS`.
+- Installer (`cli/lokyy-installer.ts`): generates `BETTER_AUTH_SECRET` (openssl rand -hex 32) on first `install` if absent. Idempotent.
+- Evidence: `docs/evidence/phase-1b/{01-login-page,02-dashboard-authed,03-after-signout}.png`.
+- Owner account for the local dev stack: `oliver@lokyy.local` / `supersecure123` (per `project_lokyy_credentials.md`).
 
 ### Phase-1 (Foundation Scaffold) — Winston, 2026-05-16
 

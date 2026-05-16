@@ -234,6 +234,14 @@ async function cmdInstall(): Promise<number> {
       ok(`LOKYY_AGENT_JWT_SECRET present`);
     }
 
+    // Better-Auth secret (Phase-1b user auth)
+    if (!current.BETTER_AUTH_SECRET) {
+      current.BETTER_AUTH_SECRET = await generateJwtSecret();
+      ok(`Generated BETTER_AUTH_SECRET (64 hex chars)`);
+    } else {
+      ok(`BETTER_AUTH_SECRET present`);
+    }
+
     writeEnvLocal(current);
     ok(`Wrote ${ENV_LOCAL} (chmod 0600)`);
   } finally {
