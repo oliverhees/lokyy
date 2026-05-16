@@ -62,7 +62,7 @@ Das Differenzierungsmerkmal gegenüber Cursor/ChatGPT/Claude.ai: **Lokyy hat ein
 - **Self-hosted auf Linux-Server**: Keine SaaS-Abhängigkeiten als kritischer Pfad.
 - **Docker-first Deployment**: ALLE Komponenten (lokyy-os-fe, lokyy-os-be, lokyy-brain, forgejo, reverse-proxy) laufen in Containern, orchestriert via docker-compose. Kein "läuft nur lokal" — von Tag-1 server-deployed.
 - **lokyy-brain bleibt eigener Service** (Decision 2026-05-16): existing Hono/TS-Service mit Forgejo-Backend wird NICHT in lokyy-os gemergt. lokyy-os spricht ausschließlich via HTTP-API (port 8787) gegen lokyy-brain. Single-Write-Path.
-- **Forgejo als Second-Brain Storage**: Git-basiert (Karpathy-style); lokyy-brain ist der einzige direkte Schreibpfad.
+- **Forgejo läuft REMOTE** (Decision 2026-05-16 post-deploy): keine Forgejo-Container im lokyy-stack. lokyy-brain wird per `LOKYY_BRAIN_FORGEJO_URL` an die externe Forgejo-Instanz angebunden; das vermeidet Duplikation existierender funktionsfähiger Infrastruktur.
 - **lokyy-brain Frontmatter Contract**: jede .md braucht `id` (ULID), `type` aus closed-list (note|capture|project|task|decision|meeting|customer|workflow|intervention|content), `title`, `created`, `updated`. Pre-commit-hook in lokyy-vault enforced.
 - **Hermes Agent (Nous Research, github.com/nousresearch/hermes-agent, MIT)** als Core Agent Framework, läuft als eigener Python-Container im lokyy-stack. **Verifiziert**: hat eingebauten Cron-Heartbeat, autonomes Skill-Learning, Multi-Agent-Subagent-Spawning, 40+ Tools, model-agnostisch. Lokyy nutzt diese Mechanismen — baut NICHT eigenen Daemon.
 - **Reverse-Proxy = Traefik** (Decision 2026-05-16): Docker-Label-Auto-Discovery aligned mit Phase-8 (Docker-MCP spawnt Services).
@@ -88,7 +88,7 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 - [ ] ISC-4: Hermes-Self-Learning + autonomous-skill-creation aktiviert + Skill-Output ist im Lokyy-Audit-Log sichtbar
 - [ ] ISC-5: Hermes-eingebauter Cron-Scheduler läuft mit mindestens 3 Lokyy-spezifischen Tasks (Hermes-internal scheduling)
 - [ ] ISC-6: Heartbeat-Cycle (Hermes-cron-task triggert): read Telos+state → plan → act → schreibt Diary in lokyy-brain
-- [ ] ISC-7: Forgejo-Container läuft im lokyy-stack docker-compose, von lokyy-brain aus push/pull-bar
+- [DROPPED] ISC-7: [DROPPED 2026-05-16 — Forgejo läuft remote, kein Container im stack; lokyy-brain spricht via LOKYY_BRAIN_FORGEJO_URL gegen externe Instanz. Siehe Decisions.]
 - [ ] ISC-8: lokyy-brain-Container läuft im lokyy-stack, /health antwortet 200 via internal Docker-Net
 - [ ] ISC-9: BrainAdapter in lokyy-os-be (TypeScript) wrappt vollständige lokyy-brain HTTP-API (notes/vault/graph/pipes)
 - [ ] ISC-10: PAI Telos Files (MISSION, GOALS, BELIEFS, soul.md, user.md) als read-only Mount in Lokyy verfügbar
@@ -122,7 +122,7 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 - [ ] ISC-38: Reminder/Cron-Management per UI (User kann Heartbeat-Tasks anpassen)
 - [ ] ISC-39: Phase-Plan + Acceptance-Demo pro Phase im Repo (`docs/phases/`)
 - [ ] ISC-40: Jedes der 6 Phasen-Demos in Playwright-E2E grün + Screenshot in Issue
-- [x] ISC-41: `docker-compose.yml` orchestriert lokyy-os-fe, lokyy-os-be, lokyy-brain, forgejo, reverse-proxy auf gemeinsamem lokyy-net
+- [x] ISC-41: `docker-compose.yml` orchestriert lokyy-os-fe, lokyy-os-be, lokyy-brain, traefik, docker-socket-proxy auf gemeinsamem lokyy-net (Forgejo läuft remote, kein Container im Stack)
 - [ ] ISC-42: BrainAdapter behandelt 409-Conflict (Note überschrieben remote) deterministisch — retry-with-merge oder surface-to-user
 - [ ] ISC-43: Anti: lokyy-os schreibt NIE direkt in Forgejo (kein git-Tool im lokyy-os-be Container; nur HTTP zu lokyy-brain)
 - [x] ISC-44: Reverse-Proxy (Caddy/Traefik) terminiert TLS und routet `/` → lokyy-os-fe; lokyy-brain :8787 ist NICHT public exposed
@@ -284,6 +284,12 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Changelog
 
+- **2026-05-16T11:30:00Z** — Forgejo wandert raus aus dem lokyy-stack
+  - **conjectured**: Forgejo gehört in den Lokyy-Docker-Stack als eigener Container, weil lokyy-brain ihn als Second-Brain-Backend braucht.
+  - **refuted_by**: Oliver hat bereits eine remote Forgejo-Instanz laufen, an die lokyy-brain anbindet ("wozu forgejo install haben wir schon remote fertig!"). Ein zweiter Forgejo im Stack dupliziert funktionierende Infrastruktur und schafft Synchronisationsschmerz für nichts.
+  - **learned**: Vor Container-Provisioning den Memory + bestehende externe Services prüfen. Nicht alles muss in den eigenen Stack — Lokyy ist ein Gateway-Layer (vgl. Hermes-Insight), und genau wie wir Hermes nutzen statt nachbauen, nutzen wir die existierende Forgejo statt sie zu duplizieren.
+  - **criterion_now**: ISC-7 als `[DROPPED]` tombstoned (ID-Stability-Regel: nicht renumerieren). LOKYY_BRAIN_FORGEJO_URL ersetzt FORGEJO_*-env-vars in .env.example und Container-Inventar. ADR-003 mit Revisions-Section ergänzt. `lokyy-forgejo-data` + `lokyy-forgejo-config` Volumes gelöscht.
+
 - **2026-05-16T21:00:00Z** — Heartbeat-Supervisor-Korrektur nach User-Feedback
   - **conjectured**: Da Hermes eingebauten Cron-Scheduler hat, braucht Lokyy keinen eigenen Heartbeat-Daemon.
   - **refuted_by**: User wies darauf hin dass Hermes-Cron Tasks *plant*, aber nichts garantiert dass sie auch *autonom ausgeführt* werden — bei Container-Crash, Hang, Server-Sleep, Missed-Cron rotten die Tasks und Autonomie ist nicht gegeben.
@@ -306,7 +312,7 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 All Phase-0 ISCs verified live on Oliver's Linux dev machine. Evidence: Playwright screenshots in `docs/evidence/phase-0/*.png`.
 
-- [x] **ISC-41** — All 6 containers running healthy on `lokyy-net`. Live `docker compose ps` (2026-05-16T11:15Z): `lokyy-brain` (healthy), `lokyy-docker-socket-proxy` (up), `lokyy-forgejo` (healthy), `lokyy-os-be` (healthy), `lokyy-os-fe` (healthy), `lokyy-traefik` (healthy). Traefik dashboard reports 7 routers / 9 services / 2 middlewares, 100% success.
+- [x] **ISC-41** — All 5 containers running healthy on `lokyy-net`. Live `docker compose ps` (2026-05-16T11:30Z): `lokyy-brain` (healthy), `lokyy-docker-socket-proxy` (up), `lokyy-os-be` (healthy), `lokyy-os-fe` (healthy), `lokyy-traefik` (healthy). Traefik dashboard reports active routers / services / middlewares, 100% success. (Forgejo deliberately not part of stack — runs remotely.)
 - [x] **ISC-44** — `lokyy-brain` reachable internally (`docker exec lokyy-os-fe wget http://lokyy-brain/` → HTTP/1.1 200 OK), refused externally (`curl http://localhost:8787/` → Status 000 / connection refused). Service has zero Traefik labels and no published port.
 - [x] **ISC-54** — `infrastructure/docker-compose.yml` uses only `${VAR}` references. `.env.local` is chmod 0600 (`-rw-------`), not tracked by git, contains the real values. No plaintext secrets in any committed file.
 - [x] **ISC-72** — Traefik (v3.7.1 via `traefik:latest` tag) routes via Docker-Label-Discovery through `docker-socket-proxy` sidecar (anti-privilege per Phase-8 doctrine — direct socket mount avoided). Dashboard at `https://traefik.lokyy.local/dashboard/` returns 401 without auth and 200 with `admin:supersecure123`. Auto-TLS resolver configured; staging-CA fallback to Traefik default cert when ACME contact email fails validation (acceptable for local dev with `-k`).

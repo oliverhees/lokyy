@@ -21,13 +21,15 @@ This ADR is the materialisation of the architecture decisions already locked in 
 
 | Container | Image | Phase | Role |
 |-----------|-------|-------|------|
-| `traefik` | `traefik:v3.2` | 0 ✅ | Reverse-proxy, auto-TLS, dashboard |
-| `forgejo` | `codeberg.org/forgejo/forgejo:9` | 0 ✅ | Git server backing `lokyy-brain` |
+| `traefik` | `traefik:latest` (v3.7.1+) | 0 ✅ | Reverse-proxy, auto-TLS, dashboard |
+| `docker-socket-proxy` | `tecnativa/docker-socket-proxy:latest` | 0 ✅ | Sanitized Docker API for Traefik (anti-privilege gate, Phase-8 doctrine pulled forward) |
 | `lokyy-os-fe` | `nginx:alpine` (placeholder) | 0 ✅ → 1 | Frontend (real build replaces placeholder in Phase-1) |
-| `lokyy-os-be` | `traefik/whoami` (placeholder) | 0 ✅ → 1 | Backend auth-gateway (real build in Phase-1) |
-| `lokyy-brain` | `traefik/whoami` (placeholder) | 0 ✅ → 3 | Second-brain HTTP-API (separate repo; real image replaces placeholder in Phase-3) |
+| `lokyy-os-be` | `nginx:alpine` (placeholder) | 0 ✅ → 1 | Backend auth-gateway (real build in Phase-1) |
+| `lokyy-brain` | `nginx:alpine` (placeholder) | 0 ✅ → 3 | Second-brain HTTP-API (separate repo; real image replaces placeholder in Phase-3) |
 | `hermes` | `nousresearch/hermes-agent` | 2 🔒 | Agent core (commented block in compose) |
 | `lokyy-heartbeat-supervisor` | (own build) | 2 🔒 | Layer-3 watchdog (commented block in compose) |
+
+**Forgejo is NOT a container in this stack.** A remote Forgejo instance already exists and is used by `lokyy-brain` as its `GIT_REMOTE`. Configured via `LOKYY_BRAIN_FORGEJO_URL` in `.env.local`. Bringing Forgejo into the lokyy stack would duplicate working remote infrastructure — see Decision below.
 
 The five active containers must be `healthy` after `docker compose up -d` to satisfy the Phase-0 done-gate (ISC-41).
 
@@ -42,10 +44,8 @@ This split enforces **ISC-44**: `lokyy-brain` and any future internal service ar
 
 Active in Phase-0:
 - `lokyy-traefik-letsencrypt` — `acme.json` (TLS certs)
-- `lokyy-forgejo-data` — Forgejo repositories
-- `lokyy-forgejo-config` — Forgejo application config
 
-Reserved (declared as commented blocks in compose, activated per phase): `lokyy-brain-vault`, `lokyy-os-db`, `hermes-data`, `heartbeat-state`.
+Reserved (declared as commented blocks in compose, activated per phase): `lokyy-brain-vault` (Phase-3 working clone of remote Forgejo repo), `lokyy-os-db`, `hermes-data`, `heartbeat-state`.
 
 ### Secrets pattern (ISC-54)
 
@@ -70,9 +70,8 @@ Reserved (declared as commented blocks in compose, activated per phase): `lokyy-
 | `lokyy.local` | `lokyy-os-fe` (catch-all) |
 | `lokyy.local/api/*` | `lokyy-os-be` |
 | `traefik.lokyy.local` | Traefik dashboard (auth-protected) |
-| `forgejo.lokyy.local` | Forgejo |
 
-For local dev, `/etc/hosts` carries one line: `127.0.0.1 lokyy.local traefik.lokyy.local forgejo.lokyy.local`. In production, real DNS records replace it.
+For local dev, `/etc/hosts` carries one line: `127.0.0.1 lokyy.local traefik.lokyy.local`. In production, real DNS records replace it. Forgejo lives at its own remote URL (configured via `LOKYY_BRAIN_FORGEJO_URL`) and is not part of Lokyy's hostname routing.
 
 ### Anti-decisions (constraint enforcement)
 
@@ -105,6 +104,13 @@ For local dev, `/etc/hosts` carries one line: `127.0.0.1 lokyy.local traefik.lok
 - ADR-003 (this document) is the architecture record — future iterations always reference back here.
 - GitHub Issues created at branch push track each acceptance criterion against an ISC.
 - Phase-0.5 (Contract Sprint) is mandatory before Phase-1 begins (per Advisor cross-check); four issues opened in parallel with Phase-0.
+
+## Revisions (2026-05-16 post-deploy)
+
+1. **Forgejo removed from stack** — a remote Forgejo instance already exists; spinning up a local container duplicates working infrastructure. `lokyy-brain` will be configured with `LOKYY_BRAIN_FORGEJO_URL` (set in `.env.local`) as its `GIT_REMOTE` when Phase-3 activates it. Removed: `forgejo` service, `forgejo-data` + `forgejo-config` volumes, `forgejo.lokyy.local` hostname route, `FORGEJO_*` env vars.
+2. **Traefik image bumped to `traefik:latest`** — pinned versions v3.2 and v3.5 advertised an old Docker client API (1.24) which Docker 29.4.1's daemon (minimum API 1.40) rejects. `traefik:latest` (v3.7.1 at deploy time) negotiates correctly.
+3. **`docker-socket-proxy` sidecar added** — Traefik now reaches Docker via the proxy (`tecnativa/docker-socket-proxy:latest`) instead of mounting `/var/run/docker.sock` directly. This is the Phase-8 anti-privilege gate pulled forward; net architectural improvement.
+4. **Placeholder images normalised** — `traefik/whoami` lacks a shell so wget-based healthchecks fail. All three placeholders (`lokyy-os-fe`, `lokyy-os-be`, `lokyy-brain`) now use `nginx:alpine` consistently.
 
 ## Cross-references
 

@@ -15,8 +15,3 @@ services:
       - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
       - --log.level=DEBUG
       - --accesslog=true
-
-  forgejo:
-    environment:
-      - FORGEJO__server__DISABLE_HTTPS=true
-      - FORGEJO__log__LEVEL=Info

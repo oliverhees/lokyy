@@ -22,7 +22,7 @@ htpasswd -nbB admin 'YOUR-STRONG-PASSWORD' | sed 's/\$/\$\$/g'
 #   → paste the line into TRAEFIK_DASHBOARD_AUTH in .env.local
 
 # 4. For local dev, add hosts entries (sudo required)
-echo "127.0.0.1 lokyy.local traefik.lokyy.local forgejo.lokyy.local" | sudo tee -a /etc/hosts
+echo "127.0.0.1 lokyy.local traefik.lokyy.local" | sudo tee -a /etc/hosts
 
 # 5. Start the stack (dev mode → Let's Encrypt staging, debug logs)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
@@ -48,13 +48,15 @@ curl -kI https://traefik.lokyy.local/
 
 | Service | Image | Phase | Public? | Role |
 |---------|-------|-------|:---:|------|
-| `traefik` | `traefik:v3.2` | 0 ✅ | yes | Reverse-proxy + auto-TLS + dashboard |
-| `forgejo` | `codeberg.org/forgejo/forgejo:9` | 0 ✅ | yes | Git server (Second-Brain storage) |
+| `traefik` | `traefik:latest` | 0 ✅ | yes | Reverse-proxy + auto-TLS + dashboard |
+| `docker-socket-proxy` | `tecnativa/docker-socket-proxy:latest` | 0 ✅ | no | Sanitized Docker API for Traefik (anti-privilege gate) |
 | `lokyy-os-fe` | `nginx:alpine` (placeholder) | 0 ✅ → 1 | yes | Frontend |
-| `lokyy-os-be` | `traefik/whoami` (placeholder) | 0 ✅ → 1 | yes (`/api`) | Backend auth-gateway |
-| `lokyy-brain` | `traefik/whoami` (placeholder) | 0 ✅ → 3 | **no** | Second-Brain HTTP-API (internal only — ISC-44) |
+| `lokyy-os-be` | `nginx:alpine` (placeholder) | 0 ✅ → 1 | yes (`/api`) | Backend auth-gateway |
+| `lokyy-brain` | `nginx:alpine` (placeholder) | 0 ✅ → 3 | **no** | Second-Brain HTTP-API (internal only — ISC-44) |
 | `hermes` | `nousresearch/hermes-agent` | 2 🔒 | no | Agent core (commented; activate in Phase-2) |
 | `lokyy-heartbeat-supervisor` | own build | 2 🔒 | no | Layer-3 watchdog (commented; activate in Phase-2) |
+
+> **Forgejo runs remotely** (not part of this stack). `lokyy-brain` is configured via `LOKYY_BRAIN_FORGEJO_URL` in `.env.local` to point at the existing external Forgejo. Bringing Forgejo into the local stack would duplicate working infrastructure.
 
 ## Networks
 
@@ -66,10 +68,8 @@ This split enforces **ISC-44**: `lokyy-brain` cannot be reached from the public 
 ## Volumes (persistent, named)
 
 - `lokyy-traefik-letsencrypt` — TLS certs (`acme.json`)
-- `lokyy-forgejo-data` — Forgejo repositories
-- `lokyy-forgejo-config` — Forgejo application config
 
-Future volumes (declared in compose, currently commented): `lokyy-brain-vault`, `lokyy-os-db`, `hermes-data`, `heartbeat-state`.
+Future volumes (declared in compose, currently commented): `lokyy-brain-vault` (Phase-3 working clone of remote Forgejo), `lokyy-os-db`, `hermes-data`, `heartbeat-state`.
 
 ## Migration Note (Etappe-1 → Etappe-2)
 

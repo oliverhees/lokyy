@@ -19,10 +19,6 @@ networks:
 volumes:
   traefik-letsencrypt:
     name: lokyy-traefik-letsencrypt
-  forgejo-data:
-    name: lokyy-forgejo-data
-  forgejo-config:
-    name: lokyy-forgejo-config
   # Reserved for future phases (uncomment when activating the phase):
   # lokyy-brain-vault:    # Phase-3 — lokyy-brain Forgejo working copy
   #   name: lokyy-brain-vault
@@ -94,38 +90,11 @@ services:
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
 
   # =====================================================================
-  # Forgejo — git server (Second-Brain storage backend)
+  # Forgejo — REMOTE (NOT a container in this stack).
+  # The Lokyy second-brain points at an externally-hosted Forgejo instance.
+  # Configured via LOKYY_BRAIN_FORGEJO_URL in .env.local; consumed by
+  # lokyy-brain in Phase-3 as its GIT_REMOTE.
   # =====================================================================
-  forgejo:
-    image: codeberg.org/forgejo/forgejo:9
-    container_name: lokyy-forgejo
-    restart: unless-stopped
-    networks:
-      - lokyy-net
-    environment:
-      - USER_UID=1000
-      - USER_GID=1000
-      - FORGEJO__database__DB_TYPE=sqlite3
-      - FORGEJO__server__ROOT_URL=https://${FORGEJO_HOST}/
-    volumes:
-      - forgejo-data:/var/lib/gitea
-      - forgejo-config:/etc/gitea
-    healthcheck:
-      # Forgejo first-run serves install page on /. /api/v1/version requires
-      # install to be completed. Healthcheck uses / which returns 200 in both
-      # install and post-install states.
-      test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/ || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.forgejo.rule=Host(`${FORGEJO_HOST}`)"
-      - "traefik.http.routers.forgejo.entrypoints=websecure"
-      - "traefik.http.routers.forgejo.tls=true"
-      - "traefik.http.routers.forgejo.tls.certresolver=letsencrypt"
-      - "traefik.http.services.forgejo.loadbalancer.server.port=3000"
 
   # =====================================================================
   # Lokyy OS Frontend (Phase-0 placeholder → Phase-1 real build)

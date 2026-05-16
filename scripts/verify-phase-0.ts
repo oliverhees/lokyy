@@ -32,12 +32,6 @@ const targets = [
     auth: null,
     waitFor: "domcontentloaded" as const,
   },
-  {
-    name: "03-forgejo-install-page",
-    url: "https://forgejo.lokyy.local/",
-    auth: null,
-    waitFor: "domcontentloaded" as const,
-  },
 ];
 
 const browser = await chromium.launch({
