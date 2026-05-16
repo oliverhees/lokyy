@@ -4,7 +4,7 @@ task: Lokyy KI-Betriebssystem — Architektur-Design
 slug: lokyy-kios-design
 effort: E3
 phase: plan
-progress: 4/81
+progress: 8/81
 mode: design
 started: 2026-05-16
 updated: 2026-05-16
@@ -137,13 +137,13 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 - [ ] ISC-53 (Phase-8, future): Docker-MCP-Whitelist erlaubter Base-Images dokumentiert + signed
 - [x] ISC-54: Anti: keine Geheimnisse (API-Keys, Tokens) als Klartext in Container-Env — alles via Docker-Secrets oder `.env.local` mit 0600
 - [ ] ISC-55: BrainAdapter cached read-heavy Endpoints (/api/notes, /api/graph) mit invalidation-on-write
-- [ ] ISC-56: Brain-MCP-Contract-Doc existiert BEVOR Hermes-Agents geschrieben werden (load-bearing per Advisor)
+- [x] ISC-56: Brain-MCP-Contract-Doc existiert BEVOR Hermes-Agents geschrieben werden (load-bearing per Advisor) — `docs/decisions/ADR-004-lokyy-brain-mcp-contract.md`
 - [ ] ISC-57: Brain Write-Concurrency unter Multi-Agent-Load verifiziert (load-test: N parallel writes → 0 lost, 0 corrupt)
 - [ ] ISC-58: ULID-Collision-Strategie dokumentiert (was bei 2 Agents mit identischer ULID — extrem unwahrscheinlich aber definiert)
-- [ ] ISC-59: Anti: Frontmatter-Validation lebt AUSSCHLIEßLICH in lokyy-brain — niemals dupliziert in lokyy-os oder Adaptern (single source of contract)
-- [ ] ISC-60: Cross-AI-Bridge ruft lokyy-brain via dem gleichen MCP/HTTP-Pfad wie alle anderen Agenten — kein paralleler Schreibweg
+- [x] ISC-59: Anti: Frontmatter-Validation lebt AUSSCHLIEßLICH in lokyy-brain — niemals dupliziert in lokyy-os oder Adaptern (single source of contract) — kontraktualisiert in ADR-006 (Lint Layer A + TypeScript Barrier Layer B)
+- [x] ISC-60: Cross-AI-Bridge ruft lokyy-brain via dem gleichen MCP/HTTP-Pfad wie alle anderen Agenten — kein paralleler Schreibweg — kontraktualisiert in ADR-004 §6
 - [ ] ISC-61: Pipes-Trigger-Ownership dokumentiert: Agenten lösen pipes aus via `POST /api/pipes/import` (oder MCP-Tool), kein Lokyy-OS-Reimplement
-- [ ] ISC-62: Per-Agent-Auth-Token in lokyy-brain (brain-side feature) + Audit-Log "welcher Agent schrieb welche Note"
+- [x] ISC-62: Per-Agent-Auth-Token in lokyy-brain (brain-side feature) + Audit-Log "welcher Agent schrieb welche Note" — kontraktualisiert in ADR-005 (stateless JWT HS256 von lokyy-os-be signed, brain-verified; mcp-audit.jsonl)
 - [ ] ISC-63: Antecedent: 4 Pre-Phase-1-Vorbedingungen erledigt (MCP-Contract-Doc, Concurrency-Audit, Compose+Auth-Decision, Validation-Location-Decision) — als GitHub-Issues getrackt
 - [ ] ISC-64: Heartbeat- vs Conductor-Ownership dokumentiert (zwei Control-Planes klar abgegrenzt; wer triggert was)
 - [ ] ISC-65: Hermes-Subagent-Spawning für Specialist-Roles (Researcher/Writer/Coder/Curator) konfiguriert; Conductor = parent Hermes-Instance
@@ -284,6 +284,18 @@ Liefere einen 6-phasen Implementations-Bauplan für Lokyy als KI-OS, der alle si
 
 ## Changelog
 
+- **2026-05-16T12:45:00Z** — Phase-0.5 Sprint fortgesetzt — ADR-005 (Auth) + ADR-006 (Validation-Location) committed
+  - **conjectured**: Auth zwischen Agents und lokyy-brain könnte mit einem geteilten static API-Key gelöst werden; Frontmatter-Validation kann zur Bequemlichkeit auch in Adaptern leben weil Brain's pre-commit-hook am Ende eh validiert.
+  - **refuted_by**: (a) Ein static API-Key vereitelt Audit + Scope-Enforcement; ohne `sub`-Claim wissen wir nicht welcher Agent geschrieben hat. (b) Wenn Adapter Frontmatter konstruieren, ist Brain's Schema in zwei Codepfaden — drift garantiert. Advisor: "single biggest contract-leak risk".
+  - **learned**: Service-zu-Service-Auth = stateless JWT HS256, lokyy-os-be signed mit `LOKYY_AGENT_JWT_SECRET`, brain-verified gegen den gleichen Secret. `sub` muss einem Eintrag in `mcp-scopes.yaml` matchen. Audit-Log JSONL in brain (`mcp-audit.jsonl`) ohne Body-Inhalt (Privacy). Frontmatter-Validation lebt EXKLUSIV in brain via `POST /api/notes/create-managed`; Adapter senden Intent (title/body/type/tags), brain owns ULID + path + frontmatter + schema-check. Lint-Rule (grep-based Layer A + TypeScript-Barrier Layer B) verhindert Drift in CI.
+  - **criterion_now**: ISC-59 als done markiert (ADR-006 strukturell + Lint); ISC-62 als done (ADR-005 JWT-flow + Audit-format). Progress 6→8/81. ISC-47 + ISC-63 + ISC-57 + ISC-58 bleiben offen (brauchen lokyy-brain-Repo-Arbeit).
+
+- **2026-05-16T12:00:00Z** — Phase-0.5 begonnen — MCP-Contract als ADR-004 spezifiziert
+  - **conjectured**: MCP-Vertrag kann später kommen, wenn lokyy-brain's Epic 5 vollständig ist; Hermes-Agents nutzen bis dahin direkte HTTP-Calls gegen brain.
+  - **refuted_by**: Advisor-Insight — wenn Hermes vor MCP landet, ossifiziert HTTP-Adapter als de-facto Agent-API und parallele Schreibwege akkumulieren. Frontmatter-Validation läuft Gefahr in lokyy-os zu lecken (ISC-59 Risiko).
+  - **learned**: MCP-Contract muss VOR Hermes-Implementation gefriert sein, mit Stub-Server-Path so dass Hermes integrieren kann bevor Epic 5 fertig ist. 8 Tools über 4 Namespaces (notes/vault/graph/pipes), `notes.create_managed` als einziger sanktionierter Schreibweg (brain owns ULID + frontmatter), `00_meta/mcp-scopes.yaml` für Per-Agent-Scope-Enforcement.
+  - **criterion_now**: ISC-56 als done markiert (ADR-004 existiert mit vollem Tool-Surface + Scope-Schema + Stub-Server-Spec + Anti-Pattern-Tabelle). ISC-60 als done (Cross-AI-Bridge nutzt gleiche MCP-Tools, kein paralleler Schreibweg). ISC-47 + ISC-63 bleiben offen bis Stub-Server in lokyy-brain repo geshippt ist.
+
 - **2026-05-16T11:30:00Z** — Forgejo wandert raus aus dem lokyy-stack
   - **conjectured**: Forgejo gehört in den Lokyy-Docker-Stack als eigener Container, weil lokyy-brain ihn als Second-Brain-Backend braucht.
   - **refuted_by**: Oliver hat bereits eine remote Forgejo-Instanz laufen, an die lokyy-brain anbindet ("wozu forgejo install haben wir schon remote fertig!"). Ein zweiter Forgejo im Stack dupliziert funktionierende Infrastruktur und schafft Synchronisationsschmerz für nichts.
@@ -333,3 +345,12 @@ During live deploy, two issues were discovered and fixed:
 - `docs/evidence/phase-0/*.png` — three screenshots (dashboard, lokyy-fe placeholder, forgejo install page)
 
 **Phase-0: ✅ COMPLETE — live-deploy verified.**
+
+### Phase-0.5 (Contract Sprint) — Winston, 2026-05-16
+
+- [x] **ISC-56** — `docs/decisions/ADR-004-lokyy-brain-mcp-contract.md` exists. Documents the full 8-tool MCP surface (notes/vault/graph/pipes), locked TypeScript type definitions, `00_meta/mcp-scopes.yaml` schema with default scopes for 5 agent identities (conductor/researcher/writer/coder/curator), stub-server contract for pre-Epic-5 integration, and the anti-pattern table forbidding ULID generation + manual frontmatter assembly in lokyy-os.
+- [x] **ISC-60** — ADR-004 §6 explicitly contracts that the Cross-AI Bridge uses the same `notes.create_managed` MCP tool as Hermes-Subagents. Bridge agents (`bridge-claude`, `bridge-openclaw`) declare their identity in the scope file; brain validates schema on the way in. No parallel write path exists.
+- [x] **ISC-59** — `docs/decisions/ADR-006-validation-lives-only-in-brain.md` locks the rule structurally. `notes.create_managed` is the sole sanctioned write path; the convenience endpoint owns ULID/path/created/updated/schema-validation. Lint enforcement: Layer A `scripts/check-no-frontmatter-leak.sh` (grep-based CI gate) + Layer B BrainAdapter TypeScript barrier (no surface for forbidden ops).
+- [x] **ISC-62** — `docs/decisions/ADR-005-service-auth-and-audit.md` defines stateless JWT HS256 signed by lokyy-os-be and verified by lokyy-brain. `sub` claim maps to `mcp-scopes.yaml` entries. Audit log at `mcp-audit.jsonl` with `{ts, agent_id, action, target_type, target_id, status, duration_ms}`; never logs body or token content. Bootstrap via `lokyy-installer` generating `LOKYY_AGENT_JWT_SECRET`.
+- [ ] **ISC-47** — Still pending: stub MCP server implementation in lokyy-brain repo (coordination with brain-repo maintainer required).
+- [ ] **ISC-63** — Still pending: Phase-1-start antecedent (#79 still open; brain-repo work).
