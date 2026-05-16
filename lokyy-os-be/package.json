@@ -1,7 +1,7 @@
 {
   "name": "lokyy-os-be",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",

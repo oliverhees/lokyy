@@ -21,6 +21,8 @@ volumes:
     name: lokyy-traefik-letsencrypt
   lokyy-os-db:
     name: lokyy-os-db
+  lokyy-hermes-data:
+    name: lokyy-hermes-data
   # Reserved for future phases (uncomment when activating the phase):
   # lokyy-brain-vault:    # Phase-3 — lokyy-brain Forgejo working copy
   #   name: lokyy-brain-vault
@@ -145,6 +147,9 @@ services:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - AUTH_BASE_URL=https://${DOMAIN}
       - AUTH_TRUSTED_ORIGINS=https://${DOMAIN}
+      # Phase-2: Hermes proxy
+      - HERMES_API_KEY=${HERMES_API_KEY:-}
+      - HERMES_BASE_URL=http://hermes:8642
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
       interval: 10s
@@ -194,24 +199,46 @@ services:
     #     - lokyy-brain-vault:/vault
 
   # =====================================================================
-  # PHASE-2: Hermes Agent (nousresearch/hermes-agent, MIT)
+  # Hermes Agent (Phase-2a) — nousresearch/hermes-agent, MIT
+  # The agent core: cron scheduler, autonomous skill learning, 40+ tools,
+  # OpenAI-compatible API server on :8642 inside the lokyy-net.
+  # API_SERVER_KEY (HERMES_API_KEY) gates the API; lokyy-os-be proxies with it.
+  # Uses its OWN named volume lokyy-hermes-data — does NOT touch the host's
+  # ~/.hermes (Oliver's standalone CLI install stays independent).
   # =====================================================================
-  # hermes:
-  #   image: nousresearch/hermes-agent:latest
-  #   container_name: lokyy-hermes
-  #   restart: unless-stopped
-  #   networks:
-  #     - lokyy-net
-  #   environment:
-  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #   volumes:
-  #     - hermes-data:/data
-  #     - ${HOME}/.claude/PAI/USER/TELOS:/telos:ro
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -fsS http://localhost:8642/health || exit 1"]
-  #     interval: 15s
-  #     timeout: 5s
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    container_name: lokyy-hermes
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    environment:
+      - HERMES_UID=${HERMES_UID:-1000}
+      - HERMES_GID=${HERMES_GID:-1000}
+      # OpenAI-compatible API server — gated by HERMES_API_KEY.
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_PORT=8642
+      - API_SERVER_KEY=${HERMES_API_KEY}
+      # LLM provider keys — at least one must be set in .env.local.
+      # Hermes picks the active model via its config; user can change with
+      # `docker compose exec hermes hermes model`.
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - lokyy-hermes-data:/opt/data
+    healthcheck:
+      # API server returns 200 on /v1/models when up + auth'd.
+      # Use bearer auth via API_SERVER_KEY.
+      test:
+        - "CMD-SHELL"
+        - "curl -fsS -H \"Authorization: Bearer $${API_SERVER_KEY}\" http://127.0.0.1:8642/v1/models > /dev/null || exit 1"
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+    command: ["gateway", "run"]
   #     retries: 5
   #     start_period: 30s
 

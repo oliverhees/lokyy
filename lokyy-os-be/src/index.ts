@@ -35,8 +35,8 @@ app.get("/health", (c) => c.text("OK", 200));
 app.get("/api/version", (c) =>
   c.json({
     service: "lokyy-os-be",
-    version: "0.3.0",
-    phase: "Phase-1d api stubs",
+    version: "0.4.0",
+    phase: "Phase-2a hermes proxy",
   })
 );
 
