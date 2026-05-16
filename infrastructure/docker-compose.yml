@@ -99,11 +99,14 @@ services:
   # =====================================================================
 
   # =====================================================================
-  # Lokyy OS Frontend (Phase-1: Vite + React 19 + TS + Tailwind 4)
+  # Lokyy OS Frontend (Phase-1c: lokyy-app — TanStack Router SPA)
+  # Build context is ../lokyy-app (full SPA with sidebar, dashboard,
+  # agents/chat/memory/vault routes). nginx serves dist + proxies /api/* to
+  # lokyy-os-be on the lokyy-net network.
   # =====================================================================
   lokyy-os-fe:
     build:
-      context: ../lokyy-os-fe
+      context: ../lokyy-app
     container_name: lokyy-os-fe
     restart: unless-stopped
     networks:

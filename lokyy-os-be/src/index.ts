@@ -71,14 +71,29 @@ app.get("/api/me", async (c) => {
  * /api/setup-needed — true if no user exists yet (first-run).
  * Used by the frontend to decide whether to redirect to /setup or /login.
  */
-app.get("/api/setup-needed", async (c) => {
-  // Reach into the Kysely instance behind better-auth to count users.
+async function countUsers(): Promise<number> {
   const k = (auth.options.database as any).db as any;
   const { count } = (await k
     .selectFrom("user")
     .select((eb: any) => eb.fn.countAll().as("count"))
     .executeTakeFirst()) as { count: number | bigint };
-  const n = typeof count === "bigint" ? Number(count) : count;
+  return typeof count === "bigint" ? Number(count) : count;
+}
+
+/**
+ * /api/lokyy/owner-exists — the shape lokyy-app expects.
+ * Returns `true` once an owner account exists; routes use this to decide
+ * between /login and /setup at first paint.
+ */
+app.get("/api/lokyy/owner-exists", async (c) => {
+  const n = await countUsers();
+  return c.json({ ownerExists: n > 0 });
+});
+
+// Kept for backwards compatibility with my Phase-1b scaffold's frontend; can
+// be removed once the older lokyy-os-fe is gone.
+app.get("/api/setup-needed", async (c) => {
+  const n = await countUsers();
   return c.json({ setupNeeded: n === 0 });
 });
 

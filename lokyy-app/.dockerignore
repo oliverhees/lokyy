@@ -2,6 +2,9 @@ node_modules
 dist
 .git
 .gitignore
-*.log
 .env*
+data
+test-results
+playwright-report
+*.log
 .DS_Store
