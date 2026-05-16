@@ -1,0 +1,26 @@
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { RouterProvider, createRouter } from '@tanstack/react-router'
+import { ThemeProvider } from 'next-themes'
+
+import { routeTree } from './routeTree.gen'
+import { ActiveThemeProvider } from './components/active-theme'
+import './styles/globals.css'
+
+const router = createRouter({ routeTree })
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+      <ActiveThemeProvider>
+        <RouterProvider router={router} />
+      </ActiveThemeProvider>
+    </ThemeProvider>
+  </StrictMode>,
+)

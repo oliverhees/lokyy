@@ -1,0 +1,7 @@
+# All user data lives here — never commit
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.json
+*.zip

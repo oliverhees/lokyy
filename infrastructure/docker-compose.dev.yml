@@ -1,0 +1,17 @@
+# Lokyy KI-OS — Dev Override (Etappe-2)
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Differences vs production:
+#   - Traefik uses Let's Encrypt STAGING CA (avoids rate-limits + invalid hostnames in dev)
+#   - Verbose Traefik logging + access log
+#   - Faster healthcheck intervals (visible feedback on first boot)
+
+services:
+  traefik:
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+      - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+      - --log.level=DEBUG
+      - --accesslog=true
