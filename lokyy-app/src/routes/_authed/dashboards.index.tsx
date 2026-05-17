@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboardIcon, PlusIcon, ClockIcon, CalendarIcon, MailIcon, ZapIcon } from 'lucide-react'
+import { LayoutDashboardIcon, PlusIcon, ClockIcon, CalendarIcon, MailIcon, ZapIcon, PlayIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,19 @@ export const Route = createFileRoute('/_authed/dashboards/')({
   component: DashboardsListPage,
 })
 
+/** YYYY-MM-DD → relative ("heute" / "gestern" / "vor 3 Tagen") + DD.MM. for older. */
+function formatRunDate(isoDate: string): string {
+  const today = new Date().toISOString().slice(0, 10)
+  if (isoDate === today) return 'heute'
+  const yesterday = new Date(Date.now() - 24 * 3600_000).toISOString().slice(0, 10)
+  if (isoDate === yesterday) return 'gestern'
+  const ageDays = Math.round((Date.parse(today) - Date.parse(isoDate)) / 86_400_000)
+  if (ageDays > 0 && ageDays < 30) return `vor ${ageDays} Tagen`
+  // For older runs, fall back to a readable date.
+  const [y, m, d] = isoDate.split('-')
+  return `${d}.${m}.${y}`
+}
+
 function DashboardsListPage() {
   const [dashboards, setDashboards] = useState<DashboardListItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +37,12 @@ function DashboardsListPage() {
 
   function reload() {
     listDashboards()
-      .then(setDashboards)
+      .then((list) => {
+        // Defensive: backend already sorts createdAt-desc, but enforce it
+        // client-side too so display order doesn't drift if state mutates.
+        const sorted = [...list].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        setDashboards(sorted)
+      })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
   }
   useEffect(reload, [])
@@ -139,15 +157,23 @@ function DashboardsListPage() {
                     </p>
                   )}
                 </CardHeader>
-                <CardContent className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <ClockIcon className="size-3" />
-                    {d.schedule}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <CalendarIcon className="size-3" />
-                    {d.runCount === 0 ? 'noch keine Runs' : `${d.runCount} Run${d.runCount > 1 ? 's' : ''}`}
-                  </span>
+                <CardContent className="flex flex-col gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1" title="Hermes-Cron Schedule">
+                      <ClockIcon className="size-3" />
+                      <span className="font-mono">{d.schedule}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarIcon className="size-3" />
+                      {d.runCount === 0 ? 'noch keine Runs' : `${d.runCount} Run${d.runCount > 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-1">
+                    <PlayIcon className="size-3" />
+                    {d.lastRunDate
+                      ? <span>Letzter Run: <span className="text-foreground">{formatRunDate(d.lastRunDate)}</span></span>
+                      : <span className="italic">Noch nicht gelaufen</span>}
+                  </div>
                 </CardContent>
               </Card>
             </Link>
