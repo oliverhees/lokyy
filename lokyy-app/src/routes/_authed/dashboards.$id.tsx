@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { createFileRoute, Link, redirect } from '@tanstack/react-router'
-import { ArrowLeftIcon, ClockIcon, KeyIcon, CalendarIcon, PlayIcon } from 'lucide-react'
+import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
+import { ArrowLeftIcon, ClockIcon, CalendarIcon, PlayIcon, PencilIcon, TrashIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { NativeSelect } from '@/components/ui/native-select'
-import { getDashboard, getDashboardData, dashboardViewUrl, runDashboardNow, type DashboardDetail, type DashboardData } from '@/lib/lokyy-dashboards'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { getDashboard, getDashboardData, dashboardViewUrl, runDashboardNow, updateDashboard, deleteDashboard, type DashboardDetail, type DashboardData } from '@/lib/lokyy-dashboards'
 
 export const Route = createFileRoute('/_authed/dashboards/$id')({
   loader: async ({ params }) => {
@@ -26,7 +29,43 @@ function DashboardDetailPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editTitle, setEditTitle] = useState(initialDashboard.title)
+  const [editSchedule, setEditSchedule] = useState(initialDashboard.schedule)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const navigate = useNavigate()
+
+  async function handleSaveEdit() {
+    setSaving(true)
+    setEditError(null)
+    try {
+      const updated = await updateDashboard(dashboard.id, {
+        title: editTitle.trim() !== dashboard.title ? editTitle.trim() : undefined,
+        schedule: editSchedule.trim() !== dashboard.schedule ? editSchedule.trim() : undefined,
+      })
+      setDashboard({ ...dashboard, ...updated, runs: dashboard.runs })
+      setEditOpen(false)
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      await deleteDashboard(dashboard.id)
+      navigate({ to: '/dashboards' })
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : String(err))
+      setDeleting(false)
+    }
+  }
 
   async function handleRunNow() {
     setRunning(true)
@@ -115,6 +154,30 @@ function DashboardDetailPage() {
             <PlayIcon className="size-3" />
             {running ? 'Läuft…' : 'Jetzt laufen'}
           </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              setEditTitle(dashboard.title)
+              setEditSchedule(dashboard.schedule)
+              setEditError(null)
+              setEditOpen(true)
+            }}
+            title="Bearbeiten"
+            data-testid="dashboard-edit"
+          >
+            <PencilIcon className="size-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setDeleteOpen(true)}
+            title="Löschen"
+            data-testid="dashboard-delete"
+            className="text-destructive hover:text-destructive"
+          >
+            <TrashIcon className="size-4" />
+          </Button>
         </div>
       </div>
 
@@ -165,6 +228,50 @@ function DashboardDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dashboard bearbeiten</DialogTitle>
+            <DialogDescription>Titel + Schedule anpassen. Andere Felder (Template, Producer, View) sind durch die LLM-Wizard-Phase abgedeckt.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="edit-title">Titel</Label>
+              <Input id="edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} data-testid="dashboard-edit-title" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-schedule">Schedule (cron)</Label>
+              <Input id="edit-schedule" value={editSchedule} onChange={(e) => setEditSchedule(e.target.value)} placeholder="0 8 * * *" className="font-mono" data-testid="dashboard-edit-schedule" />
+              <p className="text-xs text-muted-foreground">5-Field cron: minute hour day month weekday. Z.B. <code className="font-mono">0 8 * * *</code> = täglich 8:00.</p>
+            </div>
+            {editError && <div className="text-xs text-destructive">{editError}</div>}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)} disabled={saving}>Abbrechen</Button>
+            <Button onClick={handleSaveEdit} disabled={saving} data-testid="dashboard-edit-save">
+              {saving ? 'Speichert…' : 'Speichern'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dashboard löschen?</DialogTitle>
+            <DialogDescription>
+              «{dashboard.title}» und alle {dashboard.runs.length} Run{dashboard.runs.length === 1 ? '' : 's'} werden unwiderruflich gelöscht. Die Producer-Capability wird ebenfalls revoked.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleting}>Abbrechen</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting} data-testid="dashboard-delete-confirm">
+              {deleting ? 'Löscht…' : 'Endgültig löschen'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

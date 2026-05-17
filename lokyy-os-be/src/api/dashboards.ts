@@ -15,7 +15,8 @@ import {
   existsSync,
   readFileSync,
   readdirSync,
-  statSync,
+  rmSync,
+  writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
 
@@ -31,6 +32,8 @@ type ProducerJson = {
   capabilityTokenId: string;
   createdAt: string;
   originalIntent?: string;
+  /** User-customized title (overrides prettyTitle when set). */
+  title?: string;
 };
 
 function ensureSecret(): void {
@@ -83,7 +86,7 @@ dashboards.get("/", (c) => {
       const runs = listRunDates(id);
       return {
         id,
-        title: prettyTitle(id, p.template),
+        title: p.title ?? prettyTitle(id, p.template),
         template: p.template,
         schedule: p.schedule,
         createdAt: p.createdAt,
@@ -107,7 +110,7 @@ dashboards.get("/:id", (c) => {
   return c.json({
     dashboard: {
       id,
-      title: prettyTitle(id, p.template),
+      title: p.title ?? prettyTitle(id, p.template),
       template: p.template,
       schedule: p.schedule,
       createdAt: p.createdAt,
@@ -210,6 +213,92 @@ dashboards.post("/:id/run", async (c) => {
     itemCount: data.result.itemCount,
   });
 });
+
+// Update a dashboard's mutable fields. Right now only schedule (cron) and
+// title (display string) are editable — template + capability + intent are
+// anchored at creation time. Re-generating the view itself lands with the
+// LLM-Wizard later (Phase-4.x).
+dashboards.patch("/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!safeId(id)) return c.json({ error: "invalid_id" }, 400);
+  const p = readProducer(id);
+  if (!p) return c.json({ error: "not_found" }, 404);
+
+  const body = (await c.req.json().catch(() => ({}))) as {
+    schedule?: string;
+    title?: string;
+  };
+
+  if (body.schedule !== undefined) {
+    if (typeof body.schedule !== "string" || !isPlausibleCron(body.schedule)) {
+      return c.json({ error: "invalid_schedule", note: "expected 5-field cron like '0 8 * * *'" }, 400);
+    }
+    p.schedule = body.schedule.trim();
+  }
+  if (body.title !== undefined) {
+    if (typeof body.title !== "string" || body.title.trim().length < 1) {
+      return c.json({ error: "invalid_title" }, 400);
+    }
+    p.title = body.title.trim();
+  }
+
+  writeFileSync(
+    join(DASHBOARDS_ROOT, id, "producer.json"),
+    JSON.stringify(p, null, 2)
+  );
+  return c.json({
+    dashboard: {
+      id,
+      title: p.title ?? prettyTitle(id, p.template),
+      template: p.template,
+      schedule: p.schedule,
+      createdAt: p.createdAt,
+      originalIntent: p.originalIntent,
+      capabilityTokenId: p.capabilityTokenId,
+    },
+  });
+});
+
+// Delete a dashboard entirely — directory + all runs + producer-skill.
+// Also revokes the producer's capability via lokyy-mcp /admin so the
+// token is invalidated even if some Producer process still holds it.
+dashboards.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!safeId(id)) return c.json({ error: "invalid_id" }, 400);
+  const dir = join(DASHBOARDS_ROOT, id);
+  if (!existsSync(dir)) return c.json({ error: "not_found" }, 404);
+
+  // Try to revoke the capability so dangling tokens can't authenticate.
+  // Best-effort — if MCP is unreachable we still proceed with the file
+  // deletion (the capability becomes useless anyway since the dashboard
+  // is gone and save_data's ensureDashboardExists will block writes).
+  const p = readProducer(id);
+  if (p?.capabilityTokenId && SYSTEM_SECRET) {
+    try {
+      await fetch(
+        `${MCP_URL}/admin/capabilities/${encodeURIComponent(p.capabilityTokenId)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${SYSTEM_SECRET}` },
+        }
+      );
+    } catch {
+      // ignore — proceed with delete
+    }
+  }
+
+  rmSync(dir, { recursive: true, force: true });
+  return c.json({ ok: true, id });
+});
+
+/** Very loose cron-format check — 5 whitespace-separated fields. Real
+ *  validation happens in Hermes-cron later; here we just block obvious junk. */
+function isPlausibleCron(s: string): boolean {
+  const fields = s.trim().split(/\s+/);
+  if (fields.length !== 5) return false;
+  // Each field is digits, *, /, -, ,
+  return fields.every((f) => /^[\d*/,-]+$/.test(f));
+}
 
 function prettyTitle(id: string, template: string): string {
   if (template === "ki-news") return "KI-News";
