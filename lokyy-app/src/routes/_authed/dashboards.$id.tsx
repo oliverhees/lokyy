@@ -32,6 +32,7 @@ function DashboardDetailPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [editTitle, setEditTitle] = useState(initialDashboard.title)
   const [editSchedule, setEditSchedule] = useState(initialDashboard.schedule)
+  const [editIntent, setEditIntent] = useState(initialDashboard.originalIntent ?? '')
   const [editError, setEditError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -46,6 +47,10 @@ function DashboardDetailPage() {
       const updated = await updateDashboard(dashboard.id, {
         title: editTitle.trim() !== dashboard.title ? editTitle.trim() : undefined,
         schedule: editSchedule.trim() !== dashboard.schedule ? editSchedule.trim() : undefined,
+        originalIntent:
+          editIntent.trim() !== (dashboard.originalIntent ?? '')
+            ? editIntent.trim()
+            : undefined,
       })
       setDashboard({ ...dashboard, ...updated, runs: dashboard.runs })
       setEditOpen(false)
@@ -160,6 +165,7 @@ function DashboardDetailPage() {
             onClick={() => {
               setEditTitle(dashboard.title)
               setEditSchedule(dashboard.schedule)
+              setEditIntent(dashboard.originalIntent ?? '')
               setEditError(null)
               setEditOpen(true)
             }}
@@ -239,6 +245,13 @@ function DashboardDetailPage() {
             <div className="space-y-1">
               <Label htmlFor="edit-title">Titel</Label>
               <Input id="edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} data-testid="dashboard-edit-title" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-intent">Ursprünglicher Prompt</Label>
+              <Input id="edit-intent" value={editIntent} onChange={(e) => setEditIntent(e.target.value)} data-testid="dashboard-edit-intent" />
+              <p className="text-xs text-muted-foreground">
+                Nur der Anzeige-Text. View und Producer bleiben unverändert — eine echte Regenerierung kommt mit dem LLM-Wizard.
+              </p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="edit-schedule">Schedule (cron)</Label>

@@ -227,6 +227,7 @@ dashboards.patch("/:id", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     schedule?: string;
     title?: string;
+    originalIntent?: string;
   };
 
   if (body.schedule !== undefined) {
@@ -241,11 +242,20 @@ dashboards.patch("/:id", async (c) => {
     }
     p.title = body.title.trim();
   }
+  if (body.originalIntent !== undefined) {
+    if (typeof body.originalIntent !== "string" || body.originalIntent.trim().length < 3) {
+      return c.json({ error: "invalid_intent", note: ">=3 chars" }, 400);
+    }
+    // Label-only update — does NOT regenerate the view or producer.
+    // Regenerate-on-change is a separate slice (LLM-Wizard).
+    p.originalIntent = body.originalIntent.trim();
+  }
 
   writeFileSync(
     join(DASHBOARDS_ROOT, id, "producer.json"),
     JSON.stringify(p, null, 2)
   );
+  const updatedRuns = listRunDates(id);
   return c.json({
     dashboard: {
       id,
@@ -255,6 +265,7 @@ dashboards.patch("/:id", async (c) => {
       createdAt: p.createdAt,
       originalIntent: p.originalIntent,
       capabilityTokenId: p.capabilityTokenId,
+      runs: updatedRuns,
     },
   });
 });

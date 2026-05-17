@@ -57,7 +57,7 @@ export async function getDashboardData(id: string, date?: string): Promise<Dashb
 
 export async function updateDashboard(
   id: string,
-  patch: { schedule?: string; title?: string },
+  patch: { schedule?: string; title?: string; originalIntent?: string },
 ): Promise<DashboardDetail> {
   const r = await fetch(`${BASE}/${encodeURIComponent(id)}`, {
     method: 'PATCH',
