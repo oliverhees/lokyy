@@ -7,6 +7,7 @@ import { lokyyStubs } from "./api/lokyy-stubs.ts";
 import { hermesStubs } from "./api/hermes-stubs.ts";
 import { conversations } from "./api/conversations.ts";
 import { activity } from "./api/activity.ts";
+import { dashboards } from "./api/dashboards.ts";
 
 const app = new Hono();
 
@@ -123,6 +124,13 @@ const activityApp = new Hono();
 activityApp.use("*", requireAuth);
 activityApp.route("/", activity);
 app.route("/api/lokyy/activity", activityApp);
+
+// Dashboards (Phase-4) — FE-side surface for reading dashboard files +
+// proxying mutations to lokyy-mcp. Auth-guarded.
+const dashboardsApp = new Hono();
+dashboardsApp.use("*", requireAuth);
+dashboardsApp.route("/", dashboards);
+app.route("/api/lokyy/dashboards", dashboardsApp);
 
 // Phase-1d stub endpoints — sidebar routes call these on mount.
 // Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).
