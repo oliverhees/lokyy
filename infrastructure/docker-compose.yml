@@ -315,3 +315,26 @@ services:
     depends_on:
       - docker-socket-proxy
       - hermes
+
+  # =====================================================================
+  # lokyy-mcp — Lokyy System Bus (Phase-4, ADR-008, Issue #98)
+  # MCP server hosting System Skills (Lokyy-owned TS code). Bound only to
+  # lokyy-net — NOT reachable from the public internet, NO Traefik labels.
+  # Bearer auth via LOKYY_SYSTEM_SECRET; Capability-tokens land in ISC-85.
+  # =====================================================================
+  lokyy-mcp:
+    build:
+      context: ../lokyy-mcp
+    container_name: lokyy-mcp
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    environment:
+      - PORT=7878
+      - LOKYY_SYSTEM_SECRET=${LOKYY_SYSTEM_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:7878/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
