@@ -123,9 +123,11 @@ function DashboardDetailPage() {
           <iframe
             ref={iframeRef}
             src={dashboardViewUrl(dashboard.id)}
-            // ISC-95: sandbox the iframe — scripts only, no forms, no top-nav,
-            // no same-origin (so the view cannot fetch our APIs).
-            sandbox="allow-scripts"
+            // ISC-95: sandbox the iframe — scripts execute, links can open
+            // in new tabs (popups), but the iframe cannot navigate our top
+            // window, has no same-origin (so it cannot fetch our APIs),
+            // and popups escape the sandbox so external sites aren't crippled.
+            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
             title={dashboard.title}
             data-testid="dashboard-iframe"
             className="w-full block bg-background"

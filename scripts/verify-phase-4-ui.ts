@@ -125,8 +125,20 @@ const iframe = page.getByTestId("dashboard-iframe");
 if (await iframe.isVisible().catch(() => false)) {
   ok("iframe element rendered");
   const sandboxAttr = await iframe.getAttribute("sandbox");
-  if (sandboxAttr === "allow-scripts") ok(`iframe sandbox attribute = '${sandboxAttr}' (ISC-95)`);
-  else fail("iframe sandbox", `expected 'allow-scripts', got '${sandboxAttr}'`);
+  // ISC-95: scripts must run; popups allowed so 'Weiterlesen' links work;
+  // popups escape sandbox so the external site isn't crippled. No
+  // same-origin and no top-navigation — those would break the isolation.
+  const expectedFlags = ["allow-scripts", "allow-popups", "allow-popups-to-escape-sandbox"];
+  const actualFlags = (sandboxAttr ?? "").split(/\s+/).filter(Boolean);
+  const forbidden = ["allow-same-origin", "allow-top-navigation"].filter((f) =>
+    actualFlags.includes(f)
+  );
+  const missing = expectedFlags.filter((f) => !actualFlags.includes(f));
+  if (missing.length === 0 && forbidden.length === 0) {
+    ok(`iframe sandbox flags valid: '${sandboxAttr}'`);
+  } else {
+    fail("iframe sandbox", `missing ${missing.join(",")} / forbidden ${forbidden.join(",")}`);
+  }
 } else {
   fail("iframe", "not visible");
 }
