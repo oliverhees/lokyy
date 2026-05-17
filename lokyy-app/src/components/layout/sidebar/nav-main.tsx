@@ -55,7 +55,8 @@ import {
   MessageSquareHeartIcon,
   BookAIcon,
   PuzzleIcon,
-  BellIcon
+  BellIcon,
+  LayoutDashboardIcon
 } from "lucide-react";
 import { Link } from "@/lib/router-compat";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -117,6 +118,17 @@ export const navItems: NavGroup[] = [
         title: "Schedule Jobs",
         href: "/jobs",
         icon: CalendarIcon
+      }
+    ]
+  },
+  {
+    title: "Surfaces",
+    items: [
+      {
+        title: "Dashboards",
+        href: "/dashboards",
+        icon: LayoutDashboardIcon,
+        isNew: true
       }
     ]
   },

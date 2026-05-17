@@ -161,6 +161,10 @@ services:
       # user configures it once via hermes.${DOMAIN} (Hermes' own dashboard).
       - HERMES_API_KEY=${HERMES_API_KEY:-}
       - HERMES_BASE_URL=${HERMES_BASE_URL:-http://hermes:8642}
+      # Phase-4 (ADR-008): lokyy-os-be is a trusted system component that
+      # proxies dashboard mutations to lokyy-mcp on behalf of the user.
+      - LOKYY_SYSTEM_SECRET=${LOKYY_SYSTEM_SECRET}
+      - LOKYY_MCP_URL=${LOKYY_MCP_URL:-http://lokyy-mcp:7878}
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
       interval: 10s
