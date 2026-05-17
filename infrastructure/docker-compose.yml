@@ -51,6 +51,10 @@ services:
       - SERVICES=1
       - TASKS=1
       - INFO=1
+      # POST=1 added in Phase-2b so lokyy-supervisor can call
+      # POST /containers/{name}/restart. Surface still bounded to the
+      # read-flags above; restart is a container action, no exec/build/etc.
+      - POST=1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
@@ -287,22 +291,27 @@ services:
       - "traefik.http.services.hermes-dashboard.loadbalancer.server.port=9119"
 
   # =====================================================================
-  # PHASE-2: Lokyy Heartbeat Supervisor (Layer-3 watchdog)
+  # Lokyy Heartbeat Supervisor (Layer-3 watchdog) — Phase-2b, Issue #96
+  # Polls Hermes /health every TICK_INTERVAL_MS, appends activity events
+  # to the shared lokyy-os-db volume, restarts Hermes via socket-proxy on
+  # consecutive failures. See ADR-007 for the rationale.
   # =====================================================================
-  # lokyy-heartbeat-supervisor:
-  #   build:
-  #     context: ../lokyy-heartbeat-supervisor
-  #   container_name: lokyy-heartbeat-supervisor
-  #   restart: unless-stopped
-  #   networks:
-  #     - lokyy-net
-  #   environment:
-  #     - TICK_INTERVAL_SECONDS=60
-  #     - HERMES_HEALTH_URL=http://hermes:8642/health
-  #     - LOKYY_OS_BE_URL=http://lokyy-os-be/api/internal
-  #   volumes:
-  #     - heartbeat-state:/state
-  #     # PHASE-8: switch to docker-socket-proxy for hardened access
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #   depends_on:
-  #     - hermes
+  lokyy-supervisor:
+    build:
+      context: ./supervisor
+    container_name: lokyy-supervisor
+    restart: unless-stopped
+    networks:
+      - lokyy-net
+    environment:
+      - TICK_INTERVAL_MS=60000
+      - MAX_MISSED_TICKS=2
+      - HERMES_HEALTH_URL=http://hermes:8642/health
+      - DOCKER_API_BASE=http://docker-socket-proxy:2375
+      - HERMES_CONTAINER_NAME=lokyy-hermes
+      - ACTIVITY_LOG_PATH=/app/data/activity.jsonl
+    volumes:
+      - lokyy-os-db:/app/data
+    depends_on:
+      - docker-socket-proxy
+      - hermes
