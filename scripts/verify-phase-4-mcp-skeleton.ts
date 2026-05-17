@@ -176,7 +176,7 @@ console.log("─── G. DashboardBuilder System-Skill ───");
 
 // G1. Invoke via admin shortcut with KI-News intent
 const kiNewsRaw = curl(
-  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"KI-News täglich um 8 Uhr"}' http://lokyy-mcp:7878/admin/tools/lokyy.dashboards.create_via_builder/invoke`
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"KI-News täglich um 8 Uhr"}' http://lokyy-mcp:7878/tools/lokyy.dashboards.create_via_builder/invoke`
 );
 const kiNewsIdMatch = kiNewsRaw.match(/"dashboardId":"(ki-news-[a-f0-9]+)"/);
 const kiNewsCapMatch = kiNewsRaw.match(/"capabilityBearer":"(Capability-[^"]+)"/);
@@ -205,7 +205,7 @@ if (kiNewsId) {
 
 // G3. Intent detection: 'Email' keyword should pick email-digest template
 const mailRaw = curl(
-  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"Email Posteingang Zusammenfassung"}' http://lokyy-mcp:7878/admin/tools/lokyy.dashboards.create_via_builder/invoke`
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"Email Posteingang Zusammenfassung"}' http://lokyy-mcp:7878/tools/lokyy.dashboards.create_via_builder/invoke`
 );
 if (/"template":"email-digest"/.test(mailRaw)) {
   ok("intent 'Email Posteingang' → template email-digest");
@@ -217,7 +217,7 @@ if (/"template":"email-digest"/.test(mailRaw)) {
 // (We can't easily do full MCP handshake here — direct admin path proves
 // the same: registry is plumbed end-to-end and Hermes will see the tool.)
 const listToolsRaw = curl(
-  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"test"}' http://lokyy-mcp:7878/admin/tools/lokyy.dashboards.create_via_builder/invoke`
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"test"}' http://lokyy-mcp:7878/tools/lokyy.dashboards.create_via_builder/invoke`
 );
 if (listToolsRaw.includes(`"ok":true`)) {
   ok("tool registry: lokyy.dashboards.create_via_builder is invocable");
@@ -225,7 +225,68 @@ if (listToolsRaw.includes(`"ok":true`)) {
   fail("registry-wiring", "tool not invocable via admin path");
 }
 
-// G5. Cleanup capabilities created in G1-G4 so audit log stays readable
+// G5. save_data — full producer pipeline
+console.log("");
+console.log("─── G5. save_data tool (ISC-92) ───");
+// Create dashboard A + B
+const createA = curl(
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"KI-News A"}' http://lokyy-mcp:7878/tools/lokyy.dashboards.create_via_builder/invoke`
+);
+const idA = createA.match(/"dashboardId":"(ki-news-[a-f0-9]+)"/)?.[1] ?? "";
+const capA = createA.match(/"capabilityBearer":"(Capability-[^"]+)"/)?.[1] ?? "";
+const createB = curl(
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"KI-News B"}' http://lokyy-mcp:7878/tools/lokyy.dashboards.create_via_builder/invoke`
+);
+const idB = createB.match(/"dashboardId":"(ki-news-[a-f0-9]+)"/)?.[1] ?? "";
+
+// save_data using cap-A on dashboard-A → success
+const saveOk = curl(
+  `-X POST -H "Authorization: Bearer ${capA}" -H "Content-Type: application/json" -d '{"dashboardId":"${idA}","payload":{"items":[{"title":"x"}]}}' http://lokyy-mcp:7878/tools/lokyy.dashboards.save_data/invoke`
+);
+if (/"ok":true/.test(saveOk) && saveOk.includes(idA)) {
+  ok(`save_data with own-target capability → success`);
+} else {
+  fail("save_data own-target", `unexpected: ${saveOk.slice(0, 200)}`);
+}
+
+// File on disk?
+try {
+  const today = new Date().toISOString().slice(0, 10);
+  const fileContent = execSync(
+    `docker exec lokyy-mcp cat /app/data/dashboards/${idA}/runs/${today}.json`,
+    { encoding: "utf8" }
+  );
+  if (fileContent.includes("payload")) ok(`run file written at runs/${today}.json`);
+  else fail("run file", "no payload field");
+} catch (err) {
+  fail("run file", String(err).split("\n")[0]!);
+}
+
+// save_data using cap-A on dashboard-B → target_mismatch
+const saveWrong = curl(
+  `-X POST -H "Authorization: Bearer ${capA}" -H "Content-Type: application/json" -d '{"dashboardId":"${idB}","payload":{"items":[]}}' http://lokyy-mcp:7878/tools/lokyy.dashboards.save_data/invoke`
+);
+if (/target_mismatch/.test(saveWrong)) {
+  ok("save_data cross-target → target_mismatch (capability cannot reach other dashboards)");
+} else {
+  fail("cross-target deny", `expected target_mismatch, got: ${saveWrong.slice(0, 200)}`);
+}
+
+// Revoke cap-A, try again → 401 at the auth gate (before any scope-check)
+const tokenIdA = capA.match(/^Capability-([a-f0-9]+)-/)?.[1] ?? "";
+curl(
+  `-X DELETE -H "Authorization: Bearer ${SYSTEM_SECRET}" http://lokyy-mcp:7878/admin/capabilities/${tokenIdA}`
+);
+const saveRevoked = curl(
+  `-o /dev/null -w "%{http_code}" -X POST -H "Authorization: Bearer ${capA}" -H "Content-Type: application/json" -d '{"dashboardId":"${idA}","payload":{}}' http://lokyy-mcp:7878/tools/lokyy.dashboards.save_data/invoke`
+).trim();
+if (saveRevoked === "401") {
+  ok(`revoked capability → 401 on save_data (got ${saveRevoked})`);
+} else {
+  fail("revoked save", `expected 401, got ${saveRevoked}`);
+}
+
+// G6. Cleanup capabilities created in G1-G5 so audit log stays readable
 const capsRaw = curl(
   `-H "Authorization: Bearer ${SYSTEM_SECRET}" http://lokyy-mcp:7878/admin/capabilities`
 );

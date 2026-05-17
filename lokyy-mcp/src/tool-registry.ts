@@ -11,6 +11,7 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { Principal } from "./auth.ts";
 import { recordUse } from "./capabilities.ts";
 import * as DashboardBuilder from "./system-skills/DashboardBuilder/index.ts";
+import * as SaveDashboardData from "./system-skills/DashboardBuilder/save-data.ts";
 
 export type ToolEntry = {
   tool: Tool;
@@ -26,6 +27,13 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     tool: DashboardBuilder.tool,
     minPrincipal: "system",
     handle: DashboardBuilder.handle,
+  },
+  [SaveDashboardData.tool.name]: {
+    tool: SaveDashboardData.tool,
+    // Producers (User-Skills with a capability) are the typical caller.
+    // System bearer also passes — useful for ops/verify scripts.
+    minPrincipal: "capability",
+    handle: SaveDashboardData.handle,
   },
 };
 

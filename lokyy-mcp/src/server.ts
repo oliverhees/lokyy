@@ -24,6 +24,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { randomUUID } from "node:crypto";
 import { requireBearer, getPrincipal, type Principal } from "./auth.ts";
 import { admin } from "./admin.ts";
+import { toolsHttp } from "./tools-http.ts";
 import { listToolsFor, invokeTool } from "./tool-registry.ts";
 
 const PORT = Number(process.env.PORT ?? 7878);
@@ -200,6 +201,10 @@ app.route("/mcp", mcp);
 
 // Admin surface — Capability-Token management. System bearer only.
 app.route("/admin", admin);
+
+// One-shot HTTP tool invocation — accepts both System bearer and
+// Capability tokens; per-tool privilege check happens in the registry.
+app.route("/tools", toolsHttp);
 
 console.log(
   `[lokyy-mcp] listening on :${PORT} — service=${SERVICE_NAME} v${SERVICE_VERSION}`

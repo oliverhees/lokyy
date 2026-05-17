@@ -12,7 +12,6 @@ import {
   revokeCapability,
   type CapabilityScope,
 } from "./capabilities.ts";
-import { invokeTool } from "./tool-registry.ts";
 
 const ALLOWED_SCOPES: CapabilityScope[] = ["lokyy.dashboards.save_data"];
 
@@ -81,18 +80,6 @@ admin.delete("/capabilities/:tokenId", (c) => {
   return c.json({ ok: true });
 });
 
-// Direct tool invocation — system-bearer only. Used by ops + verify
-// scripts. Hermes-side LLM clients invoke via real MCP (SSE → tools/call).
-admin.post("/tools/:name/invoke", async (c) => {
-  const name = c.req.param("name");
-  const args = (await c.req.json().catch(() => ({}))) as unknown;
-  try {
-    const result = await invokeTool(name, args, {
-      kind: "system",
-      label: "system",
-    });
-    return c.json({ ok: true, result });
-  } catch (err) {
-    return c.json({ ok: false, error: (err as Error).message }, 500);
-  }
-});
+// (Direct tool invocation moved to /tools/:name/invoke — accepts both
+// System and Capability bearers; per-tool privilege check happens in
+// the registry.)
