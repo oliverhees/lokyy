@@ -23,6 +23,7 @@ import {
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { randomUUID } from "node:crypto";
 import { requireBearer, getPrincipal } from "./auth.ts";
+import { admin } from "./admin.ts";
 
 const PORT = Number(process.env.PORT ?? 7878);
 const SERVICE_NAME = "lokyy-mcp";
@@ -177,6 +178,9 @@ mcp.post("/messages", async (c) => {
 });
 
 app.route("/mcp", mcp);
+
+// Admin surface — Capability-Token management. System bearer only.
+app.route("/admin", admin);
 
 console.log(
   `[lokyy-mcp] listening on :${PORT} — service=${SERVICE_NAME} v${SERVICE_VERSION}`

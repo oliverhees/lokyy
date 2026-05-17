@@ -107,9 +107,72 @@ const postUnknown = curl(
 if (postUnknown === "404") ok(`POST with unknown sessionId → 404 (got ${postUnknown})`);
 else fail("session validation", `expected 404, got ${postUnknown}`);
 
-// ─── F. Network isolation ──────────────────────────────────────────────────
+// ─── F. Capability-Tokens (ISC-85) ─────────────────────────────────────────
 console.log("");
-console.log("─── F. lokyy-mcp not reachable via Traefik ───");
+console.log("─── F. Capability-Tokens ───");
+
+// F1. Issue a capability via /admin (system bearer)
+const issueRaw = curl(
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"scope":"lokyy.dashboards.save_data","target":"verify-test","issuedBy":"verify-script"}' http://lokyy-mcp:7878/admin/capabilities`
+);
+const capMatch = issueRaw.match(/"bearer":"(Capability-[^"]+)"/);
+const tokenIdMatch = issueRaw.match(/"tokenId":"([^"]+)"/);
+if (capMatch && tokenIdMatch) {
+  ok(`/admin/capabilities POST issued token ${tokenIdMatch[1]!.slice(0, 8)}…`);
+} else {
+  fail("issue capability", `bad response: ${issueRaw.slice(0, 200)}`);
+}
+const capBearer = capMatch?.[1] ?? "";
+const issuedTokenId = tokenIdMatch?.[1] ?? "";
+
+// F2. Capability can open /mcp SSE session
+const sseCap = curl(
+  `-N --max-time 2 -H "Authorization: Bearer ${capBearer}" http://lokyy-mcp:7878/mcp`
+);
+if (/event: endpoint/.test(sseCap)) {
+  ok("capability bearer accepted on /mcp (SSE event received)");
+} else {
+  fail("capability on /mcp", `no endpoint event; got: ${sseCap.slice(0, 120)}`);
+}
+
+// F3. Capability is REJECTED from /admin (system-only)
+const capAdmin = curl(
+  `-o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${capBearer}" http://lokyy-mcp:7878/admin/capabilities`
+).trim();
+if (capAdmin === "403") {
+  ok(`capability rejected from /admin → 403 (got ${capAdmin})`);
+} else {
+  fail("system-only gate", `expected 403, got ${capAdmin}`);
+}
+
+// F4. Revoke + try again → 401
+if (issuedTokenId) {
+  curl(
+    `-X DELETE -H "Authorization: Bearer ${SYSTEM_SECRET}" http://lokyy-mcp:7878/admin/capabilities/${issuedTokenId}`
+  );
+  const revokedTry = curl(
+    `-o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${capBearer}" http://lokyy-mcp:7878/mcp`
+  ).trim();
+  if (revokedTry === "401") {
+    ok(`revoked capability → 401 (got ${revokedTry})`);
+  } else {
+    fail("revoke", `expected 401 after revoke, got ${revokedTry}`);
+  }
+}
+
+// F5. Unknown capability → 401
+const unknownTry = curl(
+  `-o /dev/null -w "%{http_code}" -H "Authorization: Bearer Capability-fake-token-xyz" http://lokyy-mcp:7878/mcp`
+).trim();
+if (unknownTry === "401") {
+  ok(`unknown capability → 401 (got ${unknownTry})`);
+} else {
+  fail("unknown capability", `expected 401, got ${unknownTry}`);
+}
+
+// ─── G. Network isolation ──────────────────────────────────────────────────
+console.log("");
+console.log("─── G. lokyy-mcp not reachable via Traefik ───");
 try {
   // Hit traefik with a Host header for lokyy-mcp — there's no router
   // configured for it, so traefik should 404.

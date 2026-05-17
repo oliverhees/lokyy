@@ -4,14 +4,12 @@
  * Two acceptable credentials:
  *   - System Bearer (`LOKYY_SYSTEM_SECRET`) — full privilege, used by
  *     System Skills (Lokyy-owned TS code running in this container).
- *   - Capability Bearer (`Capability-<id>`) — narrow scope, issued at
- *     runtime by Lokyy when a User-Skill needs a specific Lokyy write
- *     path (e.g. Producer-Skill saving to one Dashboard). Capability
- *     validation lives in src/capabilities.ts (next slice — ISC-85).
- *
- * For ISC-82–84 (skeleton) only the System Bearer path is implemented.
+ *   - Capability Bearer (`Capability-<tokenId>-<secret>`) — narrow scope,
+ *     issued at runtime by Lokyy when a User-Skill needs a specific
+ *     Lokyy write path. Validation in capabilities.ts.
  */
 import type { Context, Next } from "hono";
+import { validateBearer, type CapabilityRecord } from "./capabilities.ts";
 
 const SYSTEM_SECRET = process.env.LOKYY_SYSTEM_SECRET ?? "";
 
@@ -23,7 +21,7 @@ if (!SYSTEM_SECRET) {
 
 export type Principal =
   | { kind: "system"; label: "system" }
-  | { kind: "capability"; tokenId: string; scope: string; target?: string };
+  | { kind: "capability"; record: CapabilityRecord };
 
 const PRINCIPAL_KEY = "__lokyy_principal__";
 
@@ -31,6 +29,7 @@ export function getPrincipal(c: Context): Principal | null {
   return (c.get(PRINCIPAL_KEY) ?? null) as Principal | null;
 }
 
+/** Bearer gate — accepts System or any non-revoked Capability token. */
 export const requireBearer = async (c: Context, next: Next) => {
   const header = c.req.header("Authorization") ?? "";
   const m = header.match(/^Bearer\s+(.+)$/i);
@@ -43,13 +42,35 @@ export const requireBearer = async (c: Context, next: Next) => {
     return next();
   }
 
-  // Capability tokens — placeholder for ISC-85. Anything matching the
-  // 'Capability-' shape gets rejected for now until the validator lands.
   if (token.startsWith("Capability-")) {
-    return c.json({ error: "capabilities_not_implemented_yet" }, 501);
+    const result = validateBearer(token);
+    if (!result.ok) {
+      return c.json(
+        { error: "invalid_capability", reason: result.reason },
+        401
+      );
+    }
+    c.set(
+      PRINCIPAL_KEY as never,
+      { kind: "capability", record: result.record } as never
+    );
+    return next();
   }
 
   return c.json({ error: "invalid_token" }, 401);
+};
+
+/** Stricter gate — only the System bearer passes. Used for admin routes. */
+export const requireSystem = async (c: Context, next: Next) => {
+  const header = c.req.header("Authorization") ?? "";
+  const m = header.match(/^Bearer\s+(.+)$/i);
+  if (!m) return c.json({ error: "missing_bearer" }, 401);
+  const token = m[1]!.trim();
+  if (!SYSTEM_SECRET || !timingSafeEqual(token, SYSTEM_SECRET)) {
+    return c.json({ error: "system_only" }, 403);
+  }
+  c.set(PRINCIPAL_KEY as never, { kind: "system", label: "system" } as never);
+  await next();
 };
 
 /** Constant-time compare so we don't leak length via timing. */

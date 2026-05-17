@@ -332,6 +332,10 @@ services:
     environment:
       - PORT=7878
       - LOKYY_SYSTEM_SECRET=${LOKYY_SYSTEM_SECRET}
+    volumes:
+      # Shared with lokyy-os-be + lokyy-supervisor. Capability-store +
+      # audit-log live here (Phase-3 will move them to lokyy-brain).
+      - lokyy-os-db:/app/data
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:7878/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
       interval: 10s
