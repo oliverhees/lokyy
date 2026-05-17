@@ -17,6 +17,17 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { auth } from "../auth.ts";
+import { dashGet } from "./hermes-dashboard-client.ts";
+
+/** Wrap a dashGet call: return the JSON on success, friendly empty + warning on failure. */
+async function safeDash<T>(path: string, emptyFallback: T): Promise<{ data: T; live: boolean; error?: string }> {
+  try {
+    const data = await dashGet<T>(path);
+    return { data, live: true };
+  } catch (err) {
+    return { data: emptyFallback, live: false, error: (err as Error).message };
+  }
+}
 
 const requireAuth: MiddlewareHandler = async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -35,12 +46,36 @@ lokyyStubs.use("*", requireAuth);
 // Agents
 // ─────────────────────────────────────────────────────────────────────────────
 
-lokyyStubs.get("/agents", (c) =>
-  c.json({
-    agents: [],
-    note: "Phase-1d stub. Real agent list arrives in Phase-2 with Hermes.",
-  })
-);
+// Wired to hermes-dashboard /api/profiles — translate Hermes shape →
+// lokyy-app's Agent type (camelCase, derived id, defaulted optional fields).
+type HermesProfile = {
+  name: string;
+  path?: string;
+  is_default?: boolean;
+  model?: string;
+  provider?: string;
+  has_env?: boolean;
+  skill_count?: number;
+  mcp_count?: number;
+  has_soul?: boolean;
+  description?: string;
+};
+lokyyStubs.get("/agents", async (c) => {
+  const r = await safeDash<{ profiles?: HermesProfile[] }>("/api/profiles", { profiles: [] });
+  const agents = (r.data.profiles ?? []).map((p) => ({
+    id: p.name,
+    name: p.name,
+    model: p.model ?? "—",
+    provider: p.provider ?? "—",
+    skillCount: p.skill_count ?? 0,
+    mcpCount: p.mcp_count ?? 0,
+    hasSoul: p.has_soul ?? false,
+    description: p.description ?? (p.is_default ? "Default agent profile." : ""),
+    isDefault: p.is_default ?? false,
+    configPath: p.path ?? "",
+  }));
+  return c.json({ agents, live: r.live, error: r.error });
+});
 
 lokyyStubs.get("/agents/:agentId/skills", (c) =>
   c.json({ skills: [] })
@@ -78,17 +113,14 @@ lokyyStubs.post("/jobs", async (c) => {
   }, 202);
 });
 
-lokyyStubs.get("/sessions", (c) =>
-  c.json({ sessions: [] })
-);
+// Wired to hermes-dashboard /api/sessions
+lokyyStubs.get("/sessions", async (c) => {
+  const r = await safeDash<{ sessions?: unknown[] }>("/api/sessions", { sessions: [] });
+  return c.json({ sessions: r.data.sessions ?? [], live: r.live, error: r.error });
+});
 
-lokyyStubs.get("/conversations", (c) =>
-  c.json({ conversations: [] })
-);
-
-lokyyStubs.get("/conversations/:id", (c) =>
-  c.json({ id: c.req.param("id"), messages: [], title: "(stub)" })
-);
+// /conversations/* moved to its own router in src/api/conversations.ts
+// (mounted directly in index.ts so it takes precedence over this sub-app).
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Prompts / Teams / Workflows / Integrations
@@ -126,7 +158,16 @@ const DEFAULT_SETTINGS = {
   phase: "Phase-1d",
 };
 
-lokyyStubs.get("/settings", (c) => c.json(DEFAULT_SETTINGS));
+// Wired to hermes-dashboard /api/config plus lokyy-specific local prefs.
+lokyyStubs.get("/settings", async (c) => {
+  const r = await safeDash<Record<string, unknown>>("/api/config", {});
+  return c.json({
+    ...DEFAULT_SETTINGS,
+    hermes: r.live ? r.data : null,
+    hermesLive: r.live,
+    hermesError: r.error,
+  });
+});
 
 lokyyStubs.post("/settings", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -186,9 +227,23 @@ lokyyStubs.get("/hermes-tools", (c) =>
   c.json({ tools: [], raw: HERMES_NOT_RUNNING_RAW })
 );
 
-lokyyStubs.get("/hermes-plugins", (c) =>
-  c.json({ plugins: [], raw: HERMES_NOT_RUNNING_RAW })
-);
+// Wired to hermes-dashboard /api/skills — Lokyy maps skills → "plugins" in this panel
+lokyyStubs.get("/hermes-plugins", async (c) => {
+  type Skill = { name: string; description: string; category: string; enabled: boolean };
+  const r = await safeDash<Skill[]>("/api/skills", []);
+  const skills = Array.isArray(r.data) ? r.data : [];
+  const plugins = skills.map((s) => ({
+    name: s.name,
+    status: s.enabled ? "enabled" : "disabled",
+    version: "—",
+    description: s.description,
+    source: s.category,
+  }));
+  return c.json({
+    plugins,
+    raw: r.live ? `[lokyy] ${skills.length} skills loaded from Hermes` : HERMES_NOT_RUNNING_RAW,
+  });
+});
 
 lokyyStubs.get("/hermes-webhooks", (c) =>
   c.json({ enabled: false, webhooks: [], raw: HERMES_NOT_RUNNING_RAW })
@@ -209,9 +264,14 @@ lokyyStubs.get("/hermes-insights", (c) =>
   })
 );
 
-lokyyStubs.get("/hermes-logs", (c) =>
-  c.json({ raw: HERMES_NOT_RUNNING_RAW, ok: false, error: "Hermes not deployed (Phase-2)" })
-);
+// Wired to hermes-dashboard /api/logs — returns recent gateway log lines.
+lokyyStubs.get("/hermes-logs", async (c) => {
+  const r = await safeDash<{ file?: string; lines?: string[] }>("/api/logs", { lines: [] });
+  if (!r.live) {
+    return c.json({ raw: HERMES_NOT_RUNNING_RAW, ok: false, error: r.error ?? "unknown" });
+  }
+  return c.json({ raw: (r.data.lines ?? []).join(""), ok: true, error: "" });
+});
 
 lokyyStubs.get("/hermes-curator", (c) =>
   c.json({
