@@ -22,36 +22,52 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { randomUUID } from "node:crypto";
-import { requireBearer, getPrincipal } from "./auth.ts";
+import { requireBearer, getPrincipal, type Principal } from "./auth.ts";
 import { admin } from "./admin.ts";
+import { listToolsFor, invokeTool } from "./tool-registry.ts";
 
 const PORT = Number(process.env.PORT ?? 7878);
 const SERVICE_NAME = "lokyy-mcp";
 const SERVICE_VERSION = "0.1.0";
 
-function buildMcpServer(): Server {
+function buildMcpServer(principal: Principal): Server {
   const server = new Server(
     { name: SERVICE_NAME, version: SERVICE_VERSION },
     { capabilities: { tools: {} } }
   );
 
-  // ISC-83: list_tools handler. Empty for the skeleton slice — System
-  // Skills register here in ISC-86+.
+  // ISC-83 + ISC-87: list_tools returns the registry filtered by the
+  // caller's privilege — Capability principals only see tools they can
+  // actually invoke, so Hermes' tool picker can't be tricked into
+  // calling something it'll just get rejected on.
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [],
+    tools: listToolsFor(principal),
   }));
 
-  // call_tool fallback so misrouted calls return a clean error instead of
-  // crashing the SDK.
-  server.setRequestHandler(CallToolRequestSchema, async (req) => ({
-    isError: true,
-    content: [
-      {
-        type: "text",
-        text: `Tool '${req.params.name}' not found. Lokyy-MCP has no tools registered in this slice (ISC-82–84). System Skills land in ISC-86+.`,
-      },
-    ],
-  }));
+  // call_tool — delegate to the shared registry; format result/error as
+  // MCP content blocks.
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    try {
+      const result = await invokeTool(
+        req.params.name,
+        req.params.arguments ?? {},
+        principal
+      );
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: (err as Error).message,
+          },
+        ],
+      };
+    }
+  });
 
   return server;
 }
@@ -148,7 +164,10 @@ mcp.get("/", (c) => {
         );
       };
 
-      const server = buildMcpServer();
+      // Per-session MCP-Server bound to the caller's principal so tool
+      // listing + dispatch can enforce privilege without re-reading the
+      // request header on every JSON-RPC call.
+      const server = buildMcpServer(principal!);
       try {
         await server.connect(transport);
       } catch (err) {

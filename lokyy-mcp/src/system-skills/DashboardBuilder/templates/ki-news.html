@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KI-News — Lokyy Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b0b0f;
+      --card: #15151c;
+      --border: #242430;
+      --text: #e7e7ee;
+      --muted: #8b8b96;
+      --accent: #8b5cf6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 32px;
+    }
+    h1 { margin: 0 0 4px; font-size: 28px; font-weight: 700; }
+    .meta { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+    .grid { display: grid; gap: 16px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card-title { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
+    .card-summary { margin: 0 0 10px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .card-source { font-size: 12px; color: var(--muted); }
+    .card-source a { color: var(--accent); text-decoration: none; }
+    .empty {
+      color: var(--muted); text-align: center;
+      padding: 60px 20px; border: 1px dashed var(--border); border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>KI-News</h1>
+  <p class="meta" id="meta">Wird geladen…</p>
+  <div class="grid" id="cards"><div class="empty">Noch keine Daten. Producer läuft täglich um 08:00.</div></div>
+
+  <script>
+    // The Lokyy host posts the current run's data via postMessage.
+    // Until then, render the "empty" state.
+    function render(data) {
+      const meta = document.getElementById('meta');
+      const cards = document.getElementById('cards');
+      if (!data || !Array.isArray(data.items) || data.items.length === 0) return;
+
+      meta.textContent = `Stand: ${data.runAt ?? 'unbekannt'}  ·  ${data.items.length} Beiträge`;
+      cards.innerHTML = data.items.map((item) => `
+        <div class="card">
+          <h2 class="card-title">${escape(item.title ?? '')}</h2>
+          <p class="card-summary">${escape(item.summary ?? '')}</p>
+          <p class="card-source">${escape(item.source ?? '')} · <a href="${escape(item.url ?? '#')}" target="_blank" rel="noopener noreferrer">Weiterlesen</a></p>
+        </div>
+      `).join('');
+    }
+    function escape(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'lokyy:dashboard:data') {
+        render(event.data.payload);
+      }
+    });
+
+    // Signal readiness to the parent (Lokyy app)
+    window.parent.postMessage({ type: 'lokyy:dashboard:ready' }, '*');
+  </script>
+</body>
+</html>

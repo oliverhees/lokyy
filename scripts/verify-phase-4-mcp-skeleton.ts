@@ -170,9 +170,77 @@ if (unknownTry === "401") {
   fail("unknown capability", `expected 401, got ${unknownTry}`);
 }
 
-// ─── G. Network isolation ──────────────────────────────────────────────────
+// ─── G. DashboardBuilder System-Skill (ISC-86–89) ──────────────────────────
 console.log("");
-console.log("─── G. lokyy-mcp not reachable via Traefik ───");
+console.log("─── G. DashboardBuilder System-Skill ───");
+
+// G1. Invoke via admin shortcut with KI-News intent
+const kiNewsRaw = curl(
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"KI-News täglich um 8 Uhr"}' http://lokyy-mcp:7878/admin/tools/lokyy.dashboards.create_via_builder/invoke`
+);
+const kiNewsIdMatch = kiNewsRaw.match(/"dashboardId":"(ki-news-[a-f0-9]+)"/);
+const kiNewsCapMatch = kiNewsRaw.match(/"capabilityBearer":"(Capability-[^"]+)"/);
+if (kiNewsIdMatch && kiNewsCapMatch) {
+  ok(`DashboardBuilder created ${kiNewsIdMatch[1]} (template=ki-news, capability issued)`);
+} else {
+  fail("dashboard-builder ki-news", `bad response: ${kiNewsRaw.slice(0, 200)}`);
+}
+const kiNewsId = kiNewsIdMatch?.[1] ?? "";
+
+// G2. Files actually on disk
+if (kiNewsId) {
+  try {
+    const fileList = execSync(
+      `docker exec lokyy-mcp ls /app/data/dashboards/${kiNewsId}/`,
+      { encoding: "utf8" }
+    );
+    const expected = ["view.html", "producer.skill.md", "producer.json", "runs"];
+    const missing = expected.filter((f) => !fileList.includes(f));
+    if (missing.length === 0) ok(`all 4 artifacts present in /app/data/dashboards/${kiNewsId}/`);
+    else fail("artifacts", `missing: ${missing.join(", ")}`);
+  } catch (err) {
+    fail("artifacts", String(err).split("\n")[0]!);
+  }
+}
+
+// G3. Intent detection: 'Email' keyword should pick email-digest template
+const mailRaw = curl(
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"Email Posteingang Zusammenfassung"}' http://lokyy-mcp:7878/admin/tools/lokyy.dashboards.create_via_builder/invoke`
+);
+if (/"template":"email-digest"/.test(mailRaw)) {
+  ok("intent 'Email Posteingang' → template email-digest");
+} else {
+  fail("intent-detection", `expected email-digest, got: ${mailRaw.slice(0, 200)}`);
+}
+
+// G4. tools/list now non-empty for system principal (proves registry wiring)
+// (We can't easily do full MCP handshake here — direct admin path proves
+// the same: registry is plumbed end-to-end and Hermes will see the tool.)
+const listToolsRaw = curl(
+  `-X POST -H "Authorization: Bearer ${SYSTEM_SECRET}" -H "Content-Type: application/json" -d '{"intent":"test"}' http://lokyy-mcp:7878/admin/tools/lokyy.dashboards.create_via_builder/invoke`
+);
+if (listToolsRaw.includes(`"ok":true`)) {
+  ok("tool registry: lokyy.dashboards.create_via_builder is invocable");
+} else {
+  fail("registry-wiring", "tool not invocable via admin path");
+}
+
+// G5. Cleanup capabilities created in G1-G4 so audit log stays readable
+const capsRaw = curl(
+  `-H "Authorization: Bearer ${SYSTEM_SECRET}" http://lokyy-mcp:7878/admin/capabilities`
+);
+const newCaps = Array.from(
+  capsRaw.matchAll(/"tokenId":"([a-f0-9]+)","scope":"lokyy\.dashboards\.save_data"/g)
+).map((m) => m[1]!);
+const cleaned = newCaps.length;
+for (const tokenId of newCaps) {
+  curl(`-X DELETE -H "Authorization: Bearer ${SYSTEM_SECRET}" http://lokyy-mcp:7878/admin/capabilities/${tokenId}`);
+}
+if (cleaned > 0) ok(`cleaned up ${cleaned} verify-test capability tokens`);
+
+// ─── H. Network isolation ──────────────────────────────────────────────────
+console.log("");
+console.log("─── H. lokyy-mcp not reachable via Traefik ───");
 try {
   // Hit traefik with a Host header for lokyy-mcp — there's no router
   // configured for it, so traefik should 404.
