@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { NativeSelect } from '@/components/ui/native-select'
-import { getDashboard, getDashboardData, dashboardViewUrl, type DashboardDetail, type DashboardData } from '@/lib/lokyy-dashboards'
+import { getDashboard, getDashboardData, dashboardViewUrl, runDashboardNow, type DashboardDetail, type DashboardData } from '@/lib/lokyy-dashboards'
 
 export const Route = createFileRoute('/_authed/dashboards/$id')({
   loader: async ({ params }) => {
@@ -20,10 +20,29 @@ export const Route = createFileRoute('/_authed/dashboards/$id')({
 })
 
 function DashboardDetailPage() {
-  const { dashboard } = Route.useLoaderData() as { dashboard: DashboardDetail }
-  const [selectedDate, setSelectedDate] = useState<string | null>(dashboard.runs[0] ?? null)
+  const { dashboard: initialDashboard } = Route.useLoaderData() as { dashboard: DashboardDetail }
+  const [dashboard, setDashboard] = useState<DashboardDetail>(initialDashboard)
+  const [selectedDate, setSelectedDate] = useState<string | null>(initialDashboard.runs[0] ?? null)
   const [data, setData] = useState<DashboardData | null>(null)
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  async function handleRunNow() {
+    setRunning(true)
+    setRunError(null)
+    try {
+      const result = await runDashboardNow(dashboard.id)
+      // Refetch dashboard metadata (runs[] now includes today) + the new data
+      const fresh = await getDashboard(dashboard.id)
+      setDashboard(fresh)
+      setSelectedDate(result.runDate)
+    } catch (err) {
+      setRunError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setRunning(false)
+    }
+  }
 
   // Load data for the currently-selected date
   useEffect(() => {
@@ -37,7 +56,7 @@ function DashboardDetailPage() {
     if (!data || !iframeRef.current?.contentWindow) return
     iframeRef.current.contentWindow.postMessage(
       { type: 'lokyy:dashboard:data', payload: data.payload },
-      window.location.origin,
+      '*', // iframe is sandboxed without allow-same-origin → opaque origin
     )
   }, [data])
 
@@ -50,7 +69,7 @@ function DashboardDetailPage() {
       if (ev.data?.type === 'lokyy:dashboard:ready' && data) {
         win.postMessage(
           { type: 'lokyy:dashboard:data', payload: data.payload },
-          window.location.origin,
+          '*', // iframe is sandboxed without allow-same-origin → opaque origin
         )
       }
     }
@@ -87,9 +106,14 @@ function DashboardDetailPage() {
               ))}
             </NativeSelect>
           )}
-          <Button variant="outline" disabled title="Hermes-Cron-Trigger landet mit nächster Slice">
+          <Button
+            variant="outline"
+            onClick={handleRunNow}
+            disabled={running}
+            data-testid="dashboard-run-now"
+          >
             <PlayIcon className="size-3" />
-            Jetzt laufen
+            {running ? 'Läuft…' : 'Jetzt laufen'}
           </Button>
         </div>
       </div>
@@ -99,9 +123,11 @@ function DashboardDetailPage() {
           <iframe
             ref={iframeRef}
             src={dashboardViewUrl(dashboard.id)}
-            // ISC-95: sandbox the iframe — scripts only, no forms, no top-nav,
-            // no same-origin (so the view cannot fetch our APIs).
-            sandbox="allow-scripts"
+            // ISC-95: sandbox the iframe — scripts execute, links can open
+            // in new tabs (popups), but the iframe cannot navigate our top
+            // window, has no same-origin (so it cannot fetch our APIs),
+            // and popups escape the sandbox so external sites aren't crippled.
+            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
             title={dashboard.title}
             data-testid="dashboard-iframe"
             className="w-full block bg-background"

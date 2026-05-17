@@ -55,6 +55,18 @@ export async function getDashboardData(id: string, date?: string): Promise<Dashb
   return (await r.json()) as DashboardData
 }
 
+export async function runDashboardNow(id: string): Promise<{ ok: true; runDate: string; itemCount: number }> {
+  const r = await fetch(`${BASE}/${encodeURIComponent(id)}/run`, {
+    method: 'POST',
+    credentials: 'same-origin',
+  })
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '')
+    throw new Error(`runDashboardNow: HTTP ${r.status} ${txt}`)
+  }
+  return (await r.json()) as { ok: true; runDate: string; itemCount: number }
+}
+
 export async function createDashboardFromIntent(intent: string): Promise<{ dashboardId: string; template: string }> {
   const r = await fetch(`${BASE}/from-intent`, {
     method: 'POST',
