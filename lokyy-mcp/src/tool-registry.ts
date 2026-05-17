@@ -12,6 +12,7 @@ import type { Principal } from "./auth.ts";
 import { recordUse } from "./capabilities.ts";
 import * as DashboardBuilder from "./system-skills/DashboardBuilder/index.ts";
 import * as SaveDashboardData from "./system-skills/DashboardBuilder/save-data.ts";
+import * as Producer from "./system-skills/Producer/index.ts";
 
 export type ToolEntry = {
   tool: Tool;
@@ -34,6 +35,13 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     // System bearer also passes — useful for ops/verify scripts.
     minPrincipal: "capability",
     handle: SaveDashboardData.handle,
+  },
+  [Producer.tool.name]: {
+    tool: Producer.tool,
+    // Run-now is privileged: it executes producer logic and can hit
+    // external APIs. System-only until we have per-user policy.
+    minPrincipal: "system",
+    handle: Producer.handle,
   },
 };
 

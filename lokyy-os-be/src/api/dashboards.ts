@@ -191,16 +191,24 @@ dashboards.post("/:id/run", async (c) => {
   if (!safeId(id)) return c.json({ error: "invalid_id" }, 400);
   const p = readProducer(id);
   if (!p) return c.json({ error: "not_found" }, 404);
-  // v1: there's no Hermes-cron link yet, so "Jetzt laufen" can only
-  // demo by writing template-defaults. Real execution comes when the
-  // Producer-Skill registration with Hermes is wired (next sub-slice).
-  return c.json(
-    {
-      ok: false,
-      note: "Hermes-cron link not wired yet — implementation lands with ISC-91-full / next sub-slice. Producer files are in place; manual run will work as soon as a Hermes-skill loader picks up producer.skill.md.",
+  // Invoke lokyy-mcp's run_now tool — pure server-to-server, system bearer.
+  const r = await fetch(`${MCP_URL}/tools/lokyy.dashboards.run_now/invoke`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SYSTEM_SECRET}`,
+      "Content-Type": "application/json",
     },
-    501
-  );
+    body: JSON.stringify({ dashboardId: id }),
+  });
+  const data = (await r.json()) as
+    | { ok: true; result: { runDate: string; itemCount: number } }
+    | { ok: false; error: string };
+  if (!data.ok) return c.json({ error: data.error }, 502);
+  return c.json({
+    ok: true,
+    runDate: data.result.runDate,
+    itemCount: data.result.itemCount,
+  });
 });
 
 function prettyTitle(id: string, template: string): string {
