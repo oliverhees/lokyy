@@ -336,6 +336,9 @@ services:
     environment:
       - PORT=7878
       - LOKYY_SYSTEM_SECRET=${LOKYY_SYSTEM_SECRET}
+      # Cron schedules in producer.json are interpreted in this timezone.
+      # Override at deploy-time via .env.local if running outside Europe/Berlin.
+      - TZ=${LOKYY_CRON_TZ:-Europe/Berlin}
     volumes:
       # Shared with lokyy-os-be + lokyy-supervisor. Capability-store +
       # audit-log live here (Phase-3 will move them to lokyy-brain).
