@@ -8,6 +8,7 @@ import { hermesStubs } from "./api/hermes-stubs.ts";
 import { conversations } from "./api/conversations.ts";
 import { activity } from "./api/activity.ts";
 import { dashboards } from "./api/dashboards.ts";
+import { workflows } from "./api/workflows.ts";
 
 const app = new Hono();
 
@@ -131,6 +132,12 @@ const dashboardsApp = new Hono();
 dashboardsApp.use("*", requireAuth);
 dashboardsApp.route("/", dashboards);
 app.route("/api/lokyy/dashboards", dashboardsApp);
+
+// Workflows (Phase-5) — CRUD + run-now, proxied to lokyy-mcp.
+const workflowsApp = new Hono();
+workflowsApp.use("*", requireAuth);
+workflowsApp.route("/", workflows);
+app.route("/api/lokyy/workflows", workflowsApp);
 
 // Phase-1d stub endpoints — sidebar routes call these on mount.
 // Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).
