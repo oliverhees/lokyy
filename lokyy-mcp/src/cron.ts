@@ -1,16 +1,15 @@
 /**
- * In-process cron scheduler — fires `lokyy.dashboards.run_now` whenever
- * a dashboard's cron expression matches the current minute (ISC-91 full).
+ * In-process cron scheduler for Dashboards + Workflows.
  *
- * Design rationale: rather than register each Producer with Hermes-cron
- * (which would require shared volume mounts, per-dashboard shell scripts,
- * cleanup on delete, etc.), we run a single-tick-per-minute loop here.
- * Same outcome, far less moving parts, and no docker-exec coupling
- * between lokyy-mcp and the hermes container.
+ * - Dashboards: producer.json.schedule → fires lokyy.dashboards.run_now
+ * - Workflows: spec.json.triggers[].cron → fires lokyy.workflows.run_now
  *
- * If the user wants to surface jobs in `hermes cron list` later, a future
- * slice can swap this for the Hermes-bridge — the run_now tool surface
- * stays the same.
+ * Single setInterval tick reloads both job lists every minute and fires
+ * any that match the current (minute, hour, dom, month, dow). Dedup
+ * window prevents accidental double-fire on jitter.
+ *
+ * Why in-process: see ADR-007/ADR-009. Avoids docker-exec/shared-volume
+ * coupling that an external scheduler would need.
  *
  * Format: 5-field POSIX cron (minute hour dom month dow). Supports *,
  * literals, comma-lists, dash-ranges, and step expressions like (asterisk)/5.
@@ -22,40 +21,77 @@ import { invokeTool } from "./tool-registry.ts";
 
 const DASHBOARDS_ROOT =
   process.env.LOKYY_DASHBOARDS_ROOT ?? "/app/data/dashboards";
+const WORKFLOWS_ROOT =
+  process.env.LOKYY_WORKFLOWS_ROOT ?? "/app/data/workflows";
 const TICK_INTERVAL_MS = 60_000;
-const DEDUP_WINDOW_MS = 50_000; // a job fires at most once per minute
+const DEDUP_WINDOW_MS = 50_000;
 
 type Job = {
-  dashboardId: string;
+  kind: "dashboard" | "workflow";
+  /** ID of the dashboard or workflow. */
+  targetId: string;
   schedule: string;
   lastFiredAt: number;
 };
 
 let jobs: Job[] = [];
 
+function jobKey(j: Pick<Job, "kind" | "targetId">): string {
+  return `${j.kind}:${j.targetId}`;
+}
+
 function loadJobs(): void {
-  const seen = new Map(jobs.map((j) => [j.dashboardId, j.lastFiredAt]));
+  const seen = new Map(jobs.map((j) => [jobKey(j), j.lastFiredAt]));
   jobs = [];
-  if (!existsSync(DASHBOARDS_ROOT)) return;
-  for (const id of readdirSync(DASHBOARDS_ROOT, { withFileTypes: true })) {
-    if (!id.isDirectory()) continue;
-    const producerPath = join(DASHBOARDS_ROOT, id.name, "producer.json");
-    if (!existsSync(producerPath)) continue;
-    try {
-      const p = JSON.parse(readFileSync(producerPath, "utf8")) as {
-        schedule?: string;
-      };
-      if (p.schedule && isPlausibleCron(p.schedule)) {
-        jobs.push({
-          dashboardId: id.name,
-          schedule: p.schedule,
-          // Keep previous lastFiredAt across reloads so a schedule change
-          // doesn't re-fire within the dedup window.
-          lastFiredAt: seen.get(id.name) ?? 0,
-        });
+
+  // Dashboards
+  if (existsSync(DASHBOARDS_ROOT)) {
+    for (const entry of readdirSync(DASHBOARDS_ROOT, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const path = join(DASHBOARDS_ROOT, entry.name, "producer.json");
+      if (!existsSync(path)) continue;
+      try {
+        const p = JSON.parse(readFileSync(path, "utf8")) as { schedule?: string };
+        if (p.schedule && isPlausibleCron(p.schedule)) {
+          const j: Job = {
+            kind: "dashboard",
+            targetId: entry.name,
+            schedule: p.schedule,
+            lastFiredAt: seen.get(`dashboard:${entry.name}`) ?? 0,
+          };
+          jobs.push(j);
+        }
+      } catch {
+        // skip corrupt
       }
-    } catch {
-      // skip corrupt producer.json
+    }
+  }
+
+  // Workflows — any trigger of type 'cron' contributes one job (a workflow
+  // can have multiple cron triggers, e.g. weekday morning + Sunday noon).
+  if (existsSync(WORKFLOWS_ROOT)) {
+    for (const entry of readdirSync(WORKFLOWS_ROOT, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const path = join(WORKFLOWS_ROOT, entry.name, "spec.json");
+      if (!existsSync(path)) continue;
+      try {
+        const s = JSON.parse(readFileSync(path, "utf8")) as {
+          triggers?: Array<{ type?: string; schedule?: string }>;
+        };
+        for (const t of s.triggers ?? []) {
+          if (t.type === "cron" && t.schedule && isPlausibleCron(t.schedule)) {
+            const j: Job = {
+              kind: "workflow",
+              targetId: entry.name,
+              schedule: t.schedule,
+              lastFiredAt: seen.get(`workflow:${entry.name}`) ?? 0,
+            };
+            jobs.push(j);
+          }
+        }
+      } catch {
+        // skip corrupt
+      }
     }
   }
 }
@@ -110,18 +146,22 @@ async function tick(): Promise<void> {
     if (!cronMatches(job.schedule, now)) continue;
     if (Date.now() - job.lastFiredAt < DEDUP_WINDOW_MS) continue;
     job.lastFiredAt = Date.now();
+    const tool =
+      job.kind === "dashboard"
+        ? "lokyy.dashboards.run_now"
+        : "lokyy.workflows.run_now";
+    const args =
+      job.kind === "dashboard"
+        ? { dashboardId: job.targetId }
+        : { workflowId: job.targetId };
     console.log(
-      `[cron] fire dashboard=${job.dashboardId} schedule="${job.schedule}" at=${now.toISOString()}`
+      `[cron] fire ${job.kind}=${job.targetId} schedule="${job.schedule}" at=${now.toISOString()}`
     );
     try {
-      await invokeTool(
-        "lokyy.dashboards.run_now",
-        { dashboardId: job.dashboardId },
-        { kind: "system", label: "system" }
-      );
+      await invokeTool(tool, args, { kind: "system", label: "system" });
     } catch (err) {
       console.error(
-        `[cron] dashboard=${job.dashboardId} run_now failed:`,
+        `[cron] ${job.kind}=${job.targetId} ${tool} failed:`,
         (err as Error).message
       );
     }
@@ -130,27 +170,31 @@ async function tick(): Promise<void> {
 
 export function startCron(): void {
   loadJobs();
+  const lines = jobs.map(
+    (j) => `${j.kind}:${j.targetId} (${j.schedule})`
+  );
   console.log(
     `[cron] started · tick=${TICK_INTERVAL_MS / 1000}s · ${jobs.length} job(s) scheduled` +
-      (jobs.length
-        ? "\n         " +
-          jobs.map((j) => `${j.dashboardId} (${j.schedule})`).join("\n         ")
-        : "")
+      (lines.length > 0 ? "\n         " + lines.join("\n         ") : "")
   );
-  // First tick after one full minute — avoids firing immediately on startup.
   setInterval(tick, TICK_INTERVAL_MS);
 }
 
-// Exposed for verify scripts: list current jobs (no auth — same surface
-// already protected by the bearer that gates everything else).
+/** Exposed for ops + verify scripts. */
 export function currentJobs(): Array<{
-  dashboardId: string;
+  kind: "dashboard" | "workflow";
+  targetId: string;
   schedule: string;
   lastFiredAt: number | null;
+  /** Backwards-compat alias for the dashboard-only earlier API. */
+  dashboardId?: string;
 }> {
   return jobs.map((j) => ({
-    dashboardId: j.dashboardId,
+    kind: j.kind,
+    targetId: j.targetId,
     schedule: j.schedule,
     lastFiredAt: j.lastFiredAt || null,
+    // Keep the old field for any existing caller that only knew dashboards.
+    dashboardId: j.kind === "dashboard" ? j.targetId : undefined,
   }));
 }

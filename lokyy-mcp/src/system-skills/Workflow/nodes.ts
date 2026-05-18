@@ -178,6 +178,52 @@ const dashboardSaveData: NodeExecutor = async (config, inputs, _ctx) => {
   );
 };
 
+// ─── hermes-agent ──────────────────────────────────────────────────────────
+// Calls a specific Hermes-Profile (with its skills + MCPs already attached
+// in the Hermes config). Profile picker in the FE pulls this list from
+// /api/lokyy/agents — here we just route to Hermes /v1/chat/completions
+// with the profile-name as the model field.
+//
+// Config:
+//   - profile:      string (required) — profile name like 'default'
+//   - userPrompt:   string (required)  — supports {{nodeId}} placeholders
+//   - systemPrompt: string (optional)  — override profile default
+//   - temperature:  number (optional, default 0.4)
+// Returns: { content, raw }
+const hermesAgent: NodeExecutor = async (config, inputs) => {
+  const profile = config.profile;
+  const userPrompt = config.userPrompt;
+  if (typeof profile !== "string" || profile.length < 1) {
+    throw new Error("hermes-agent: config.profile (string) required");
+  }
+  if (typeof userPrompt !== "string" || userPrompt.length < 1) {
+    throw new Error("hermes-agent: config.userPrompt (string) required");
+  }
+  const systemPrompt = typeof config.systemPrompt === "string" ? config.systemPrompt : undefined;
+  const temperature = typeof config.temperature === "number" ? config.temperature : 0.4;
+  const messages = [
+    ...(systemPrompt ? [{ role: "system", content: interpolate(systemPrompt, inputs) }] : []),
+    { role: "user", content: interpolate(userPrompt, inputs) },
+  ];
+  const r = await fetch(`${HERMES_BASE_URL}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(HERMES_API_KEY ? { Authorization: `Bearer ${HERMES_API_KEY}` } : {}),
+    },
+    body: JSON.stringify({
+      model: profile,
+      messages,
+      stream: false,
+      temperature,
+    }),
+  });
+  if (!r.ok) throw new Error(`hermes-agent: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+  const data = (await r.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content ?? "";
+  return { content, profile, raw: data };
+};
+
 // ─── Registry ──────────────────────────────────────────────────────────────
 
 export const NODE_EXECUTORS: Record<string, NodeExecutor> = {
@@ -185,8 +231,9 @@ export const NODE_EXECUTORS: Record<string, NodeExecutor> = {
   value,
   "http-fetch": httpFetch,
   "llm-call": llmCall,
+  "hermes-agent": hermesAgent,
   "dashboard.save_data": dashboardSaveData,
-  // Phase-5.x adds: 'branch' (true/false handles)
+  // Phase-5.x adds: 'branch' (true/false handles), 'hermes-skill'
 };
 
 export function isKnownNodeType(t: string): boolean {

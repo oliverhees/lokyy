@@ -115,6 +115,7 @@ function WorkflowDetailPage() {
           <div data-testid="workflow-nodes-card">
             <WorkflowEditor
               spec={spec}
+              lastRunNodes={activeRun?.nodes}
               onSave={async (next) => {
                 const updated = await updateWorkflow(spec.id, next)
                 setSpec(updated.spec)
