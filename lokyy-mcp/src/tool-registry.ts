@@ -12,6 +12,7 @@ import type { Principal } from "./auth.ts";
 import { recordUse } from "./capabilities.ts";
 import * as DashboardBuilder from "./system-skills/DashboardBuilder/index.ts";
 import * as SaveDashboardData from "./system-skills/DashboardBuilder/save-data.ts";
+import * as DashboardChat from "./system-skills/DashboardBuilder/chat.ts";
 import * as Producer from "./system-skills/Producer/index.ts";
 
 export type ToolEntry = {
@@ -42,6 +43,12 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     // external APIs. System-only until we have per-user policy.
     minPrincipal: "system",
     handle: Producer.handle,
+  },
+  [DashboardChat.tool.name]: {
+    tool: DashboardChat.tool,
+    // Chat-Wizard hits Hermes LLM — system-only (LLM token costs $).
+    minPrincipal: "system",
+    handle: DashboardChat.handle,
   },
 };
 

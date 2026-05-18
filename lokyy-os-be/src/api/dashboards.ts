@@ -159,6 +159,33 @@ dashboards.get("/:id/data", (c) => {
   }
 });
 
+// Chat-Wizard: stateless multi-turn conversation that produces a
+// dashboard spec. FE sends the conversation history; backend proxies to
+// lokyy-mcp's chat tool which calls Hermes LLM. Response is either a
+// continuation message or a final spec ready to be created.
+dashboards.post("/chat", async (c) => {
+  ensureSecret();
+  const body = (await c.req.json().catch(() => ({}))) as {
+    messages?: Array<{ role: "user" | "assistant"; content: string }>;
+  };
+  if (!Array.isArray(body.messages) || body.messages.length === 0) {
+    return c.json({ error: "messages required" }, 400);
+  }
+  const r = await fetch(`${MCP_URL}/tools/lokyy.dashboards.chat/invoke`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SYSTEM_SECRET}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ messages: body.messages }),
+  });
+  const data = (await r.json()) as
+    | { ok: true; result: unknown }
+    | { ok: false; error: string };
+  if (!data.ok) return c.json({ error: data.error }, 502);
+  return c.json(data.result);
+});
+
 dashboards.post("/from-intent", async (c) => {
   ensureSecret();
   const body = (await c.req.json().catch(() => ({}))) as { intent?: string };

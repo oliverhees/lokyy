@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboardIcon, PlusIcon, ClockIcon, CalendarIcon, MailIcon, ZapIcon, PlayIcon } from 'lucide-react'
+import { LayoutDashboardIcon, PlusIcon, ClockIcon, CalendarIcon, MailIcon, ZapIcon, PlayIcon, SparklesIcon, SendIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { listDashboards, createDashboardFromIntent, type DashboardListItem } from '@/lib/lokyy-dashboards'
+import { listDashboards, createDashboardFromIntent, dashboardChat, updateDashboard, type DashboardListItem, type ChatTurn } from '@/lib/lokyy-dashboards'
 
 export const Route = createFileRoute('/_authed/dashboards/')({
   component: DashboardsListPage,
@@ -27,12 +26,18 @@ function formatRunDate(isoDate: string): string {
   return `${d}.${m}.${y}`
 }
 
+type Spec = { intent: string; schedule: string; title: string }
+
 function DashboardsListPage() {
   const [dashboards, setDashboards] = useState<DashboardListItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [intent, setIntent] = useState('')
+  const [messages, setMessages] = useState<ChatTurn[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatBusy, setChatBusy] = useState(false)
+  const [pendingSpec, setPendingSpec] = useState<Spec | null>(null)
   const [creating, setCreating] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
   function reload() {
@@ -47,13 +52,52 @@ function DashboardsListPage() {
   }
   useEffect(reload, [])
 
-  async function submit() {
-    if (intent.trim().length < 3 || creating) return
+  function resetWizard() {
+    setMessages([])
+    setChatInput('')
+    setPendingSpec(null)
+    setChatBusy(false)
+    setCreating(false)
+  }
+
+  async function sendChatTurn() {
+    const text = chatInput.trim()
+    if (text.length < 1 || chatBusy) return
+    const next: ChatTurn[] = [...messages, { role: 'user', content: text }]
+    setMessages(next)
+    setChatInput('')
+    setChatBusy(true)
+    try {
+      const res = await dashboardChat(next)
+      if (res.kind === 'message') {
+        setMessages([...next, { role: 'assistant', content: res.content }])
+      } else {
+        // Got a structured spec — show confirmation card; don't append to chat.
+        setPendingSpec(res.spec)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setChatBusy(false)
+      // Scroll the chat pane to the latest message
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+      }, 50)
+    }
+  }
+
+  async function confirmCreate() {
+    if (!pendingSpec || creating) return
     setCreating(true)
     try {
-      const result = await createDashboardFromIntent(intent.trim())
+      const result = await createDashboardFromIntent(pendingSpec.intent)
+      // Apply schedule + title overrides if they differ from defaults
+      await updateDashboard(result.dashboardId, {
+        schedule: pendingSpec.schedule,
+        title: pendingSpec.title,
+      })
       setDialogOpen(false)
-      setIntent('')
+      resetWizard()
       navigate({ to: '/dashboards/$id', params: { id: result.dashboardId } })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -71,48 +115,121 @@ function DashboardsListPage() {
             Selbstgebaute Dashboards — agentengetrieben, mit Historie. Chatte deinen Wunsch und Lokyy bastelt die View + den Producer-Skill.
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetWizard() }}>
           <DialogTrigger asChild>
             <Button data-testid="dashboards-create">
               <PlusIcon className="size-4" />
               Neues Dashboard
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Neues Dashboard erstellen</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <SparklesIcon className="size-4 text-primary" />
+                Dashboard-Wizard
+              </DialogTitle>
               <DialogDescription>
-                Beschreibe in einem Satz was du sehen willst. Lokyy wählt die passende Vorlage und legt einen Producer an.
+                Erzähl mir was du sehen willst. Lokyy stellt 1-2 Rückfragen und legt's dann an.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="intent">Intent</Label>
-              <Input
-                id="intent"
-                data-testid="dashboards-intent-input"
-                placeholder="z.B. KI-News täglich um 8 Uhr"
-                value={intent}
-                onChange={(e) => setIntent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    submit()
-                  }
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                Vorlagen heute: KI-News, Email-Digest. Weitere kommen mit dem LLM-Generator.
-              </p>
+
+            <div
+              ref={scrollRef}
+              className="space-y-3 max-h-80 overflow-y-auto py-2"
+              data-testid="dashboards-chat-messages"
+            >
+              {messages.length === 0 && !pendingSpec && (
+                <div className="text-muted-foreground text-sm italic px-1">
+                  Beispiel: «KI-News morgens um 8», oder «Tägliche Email-Zusammenfassung um 7 Uhr»
+                </div>
+              )}
+              {messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    data-testid={`chat-msg-${m.role}`}
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                      m.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-foreground'
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {chatBusy && (
+                <div className="flex justify-start">
+                  <div className="bg-muted rounded-lg px-3 py-2 text-sm text-muted-foreground">
+                    Lokyy denkt nach…
+                  </div>
+                </div>
+              )}
+              {pendingSpec && (
+                <Card data-testid="dashboards-spec-preview" className="border-primary/40">
+                  <CardHeader className="pb-2">
+                    <div className="text-xs font-semibold text-primary uppercase tracking-wide">Bereit zum Erstellen</div>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground text-xs">Titel</span>
+                      <div className="font-medium">{pendingSpec.title}</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground text-xs">Was zeigt das Dashboard?</span>
+                      <div className="text-sm">«{pendingSpec.intent}»</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground text-xs">Schedule</span>
+                      <div className="font-mono text-sm">{pendingSpec.schedule}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
+
+            {!pendingSpec && (
+              <div className="flex items-center gap-2">
+                <Input
+                  data-testid="dashboards-chat-input"
+                  placeholder="Schreib deinen Wunsch…"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  disabled={chatBusy}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      sendChatTurn()
+                    }
+                  }}
+                />
+                <Button
+                  size="icon"
+                  onClick={sendChatTurn}
+                  disabled={chatBusy || chatInput.trim().length === 0}
+                  data-testid="dashboards-chat-send"
+                >
+                  <SendIcon className="size-4" />
+                </Button>
+              </div>
+            )}
+
             <DialogFooter>
-              <Button variant="ghost" onClick={() => setDialogOpen(false)}>Abbrechen</Button>
-              <Button
-                onClick={submit}
-                disabled={intent.trim().length < 3 || creating}
-                data-testid="dashboards-create-submit"
-              >
-                {creating ? 'Wird erstellt…' : 'Erstellen'}
+              <Button variant="ghost" onClick={() => { setDialogOpen(false); resetWizard() }} disabled={creating}>
+                Abbrechen
               </Button>
+              {pendingSpec ? (
+                <>
+                  <Button variant="outline" onClick={() => setPendingSpec(null)} disabled={creating}>
+                    Anpassen
+                  </Button>
+                  <Button onClick={confirmCreate} disabled={creating} data-testid="dashboards-confirm-create">
+                    {creating ? 'Wird erstellt…' : 'Erstellen'}
+                  </Button>
+                </>
+              ) : null}
             </DialogFooter>
           </DialogContent>
         </Dialog>

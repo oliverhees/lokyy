@@ -339,6 +339,10 @@ services:
       # Cron schedules in producer.json are interpreted in this timezone.
       # Override at deploy-time via .env.local if running outside Europe/Berlin.
       - TZ=${LOKYY_CRON_TZ:-Europe/Berlin}
+      # Chat-Wizard (Phase-4.6) calls Hermes /v1/chat/completions for
+      # the conversational dashboard-creation flow.
+      - HERMES_BASE_URL=${HERMES_BASE_URL:-http://hermes:8642}
+      - HERMES_API_KEY=${HERMES_API_KEY:-}
     volumes:
       # Shared with lokyy-os-be + lokyy-supervisor. Capability-store +
       # audit-log live here (Phase-3 will move them to lokyy-brain).

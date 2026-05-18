@@ -55,6 +55,26 @@ export async function getDashboardData(id: string, date?: string): Promise<Dashb
   return (await r.json()) as DashboardData
 }
 
+export type ChatTurn = { role: 'user' | 'assistant'; content: string }
+
+export type ChatResponse =
+  | { kind: 'message'; content: string }
+  | { kind: 'spec'; spec: { intent: string; schedule: string; title: string } }
+
+export async function dashboardChat(messages: ChatTurn[]): Promise<ChatResponse> {
+  const r = await fetch(`${BASE}/chat`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
+  })
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '')
+    throw new Error(`dashboardChat: HTTP ${r.status} ${txt}`)
+  }
+  return (await r.json()) as ChatResponse
+}
+
 export async function updateDashboard(
   id: string,
   patch: { schedule?: string; title?: string; originalIntent?: string },
