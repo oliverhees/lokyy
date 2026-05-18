@@ -35,7 +35,9 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   SkipForwardIcon,
+  BrainCircuitIcon,
 } from 'lucide-react'
+import { listAgents, type Agent } from '@/lib/lokyy-agents'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -99,6 +101,17 @@ const NODE_META: Record<
     summary: (c) => {
       const p = typeof c.userPrompt === 'string' ? c.userPrompt : ''
       return p.slice(0, 50) + (p.length > 50 ? '…' : '')
+    },
+  },
+  'hermes-agent': {
+    icon: BrainCircuitIcon,
+    color: 'border-fuchsia-500/40 bg-fuchsia-500/10',
+    label: 'Hermes Agent',
+    category: 'agent',
+    summary: (c) => {
+      const profile = typeof c.profile === 'string' ? c.profile : '(profile?)'
+      const p = typeof c.userPrompt === 'string' ? c.userPrompt : ''
+      return `${profile} · ${p.slice(0, 40)}${p.length > 40 ? '…' : ''}`
     },
   },
   'dashboard.save_data': {
@@ -544,7 +557,11 @@ function NodePanel({
 }) {
   const meta = NODE_META[editing.spec.type] ?? null
   const Icon = meta?.icon ?? CodeIcon
-  const supportsTemplates = editing.spec.type === 'llm-call' || editing.spec.type === 'dashboard.save_data'
+  const supportsTemplates =
+    editing.spec.type === 'llm-call' ||
+    editing.spec.type === 'hermes-agent' ||
+    editing.spec.type === 'dashboard.save_data'
+  const isHermesAgent = editing.spec.type === 'hermes-agent'
 
   return (
     <>
@@ -575,6 +592,8 @@ function NodePanel({
             ID wird als Variable-Name benutzt: <code className="font-mono">{`{{${editing.spec.id}}}`}</code>
           </p>
         </div>
+
+        {isHermesAgent && <HermesAgentPicker editing={editing} onChange={onChange} />}
 
         {supportsTemplates && (
           <div className="rounded-md border bg-muted/30 p-3 space-y-2">
@@ -643,6 +662,111 @@ function NodePanel({
 const _reservedIcons = { RouteIcon }
 void _reservedIcons
 
+// ─── Hermes Agent Picker ───────────────────────────────────────────────────
+
+function HermesAgentPicker({
+  editing,
+  onChange,
+}: {
+  editing: EditingState
+  onChange: (next: EditingState) => void
+}) {
+  const [agents, setAgents] = useState<Agent[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  useEffect(() => {
+    listAgents()
+      .then(setAgents)
+      .catch((e) => {
+        setLoadError(e instanceof Error ? e.message : String(e))
+        setAgents([])
+      })
+  }, [])
+
+  // Read currently-selected profile out of the JSON config-text.
+  const currentProfile = (() => {
+    try {
+      const c = JSON.parse(editing.configText) as { profile?: string }
+      return typeof c.profile === 'string' ? c.profile : ''
+    } catch {
+      return ''
+    }
+  })()
+
+  const selected = agents?.find((a) => a.id === currentProfile) ?? null
+
+  function setProfile(profile: string) {
+    let c: Record<string, unknown> = {}
+    try {
+      c = JSON.parse(editing.configText)
+    } catch {
+      // keep defaults
+    }
+    c.profile = profile
+    onChange({
+      ...editing,
+      configText: JSON.stringify(c, null, 2),
+      configError: null,
+    })
+  }
+
+  return (
+    <div className="rounded-md border bg-fuchsia-500/5 border-fuchsia-500/30 p-3 space-y-2" data-testid="hermes-agent-picker">
+      <div className="flex items-center gap-1.5 text-xs">
+        <BrainCircuitIcon className="size-3 text-fuchsia-500" />
+        <span className="font-semibold">Hermes Agent (Profil)</span>
+      </div>
+
+      {loadError && (
+        <p className="text-[10px] text-destructive">Fehler beim Laden der Profile: {loadError}</p>
+      )}
+
+      {agents === null ? (
+        <p className="text-[10px] text-muted-foreground italic">lade Profile…</p>
+      ) : agents.length === 0 ? (
+        <p className="text-[10px] text-muted-foreground italic">
+          Keine Hermes-Profile gefunden. Konfiguriere mindestens einen Provider in Hermes.
+        </p>
+      ) : (
+        <select
+          className="w-full rounded-md border bg-background px-2 py-1.5 text-xs font-mono"
+          value={currentProfile}
+          onChange={(e) => setProfile(e.target.value)}
+          data-testid="hermes-agent-profile-select"
+        >
+          <option value="">— Profil wählen —</option>
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} ({a.model})
+            </option>
+          ))}
+        </select>
+      )}
+
+      {selected && (
+        <div className="text-[10px] text-muted-foreground space-y-0.5">
+          <div>
+            <span className="opacity-60">Model:</span>{' '}
+            <code className="font-mono">{selected.model}</code>
+          </div>
+          <div>
+            <span className="opacity-60">Provider:</span> {selected.provider}{' '}
+            <span className="opacity-60 ml-2">·</span> {selected.skillCount} Skills · {selected.mcpCount} MCPs
+            {selected.hasSoul && <span className="ml-2">· Soul</span>}
+          </div>
+          {selected.description && (
+            <div className="opacity-60 italic line-clamp-2 pt-0.5">{selected.description}</div>
+          )}
+        </div>
+      )}
+
+      <p className="text-[10px] text-muted-foreground pt-1">
+        Der Agent läuft mit allen Skills + MCPs aus diesem Profil. Output kommt im{' '}
+        <code className="font-mono">content</code>-Feld.
+      </p>
+    </div>
+  )
+}
+
 function defaultConfigFor(type: string): Record<string, unknown> {
   switch (type) {
     case 'value':
@@ -653,6 +777,12 @@ function defaultConfigFor(type: string): Record<string, unknown> {
       return {
         systemPrompt: 'Du bist ein hilfreicher Assistent.',
         userPrompt: 'Schreib einen kurzen Witz.',
+      }
+    case 'hermes-agent':
+      return {
+        profile: 'default',
+        systemPrompt: '',
+        userPrompt: 'Beantworte: {{previousNode}}',
       }
     case 'dashboard.save_data':
       return { dashboardId: 'replace-with-dashboard-id', payload: { items: [] } }
@@ -669,6 +799,8 @@ function configHelp(type: string): string {
       return 'Felder: url (required), method, headers, body, jsonResponse (default true).'
     case 'llm-call':
       return 'Felder: userPrompt (required), systemPrompt, model, temperature. Variablen siehe oben.'
+    case 'hermes-agent':
+      return 'Felder: profile (required — Hermes-Profilname), userPrompt (required), systemPrompt, temperature. Output enthält content + profile + raw Response.'
     case 'dashboard.save_data':
       return 'Felder: dashboardId (required), payload (object oder Variable). Wenn payload weggelassen + 1 upstream-node, dessen output wird verwendet.'
     case 'manual-trigger':

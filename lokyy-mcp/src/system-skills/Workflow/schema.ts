@@ -21,6 +21,7 @@ export type NodeType =
   | "http-fetch"
   | "value"
   | "llm-call"
+  | "hermes-agent"
   | "dashboard.save_data"
   | "branch";
 
@@ -29,6 +30,7 @@ export const NODE_TYPES: NodeType[] = [
   "http-fetch",
   "value",
   "llm-call",
+  "hermes-agent",
   "dashboard.save_data",
   "branch",
 ];
