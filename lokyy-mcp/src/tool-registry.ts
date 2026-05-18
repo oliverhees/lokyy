@@ -15,6 +15,7 @@ import * as SaveDashboardData from "./system-skills/DashboardBuilder/save-data.t
 import * as DraftChat from "./system-skills/DashboardBuilder/draft-chat.ts";
 import * as FromDraft from "./system-skills/DashboardBuilder/from-draft.ts";
 import * as Producer from "./system-skills/Producer/index.ts";
+import { tools as workflowTools } from "./system-skills/Workflow/index.ts";
 
 export type ToolEntry = {
   tool: Tool;
@@ -57,6 +58,15 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     minPrincipal: "system",
     handle: FromDraft.handle,
   },
+  // Workflows (Phase-5.0) — all system-only. lokyy-os-be is the trust-bridge.
+  [workflowTools.create.tool.name]: { tool: workflowTools.create.tool, minPrincipal: "system", handle: workflowTools.create.handle },
+  [workflowTools.list.tool.name]: { tool: workflowTools.list.tool, minPrincipal: "system", handle: workflowTools.list.handle },
+  [workflowTools.get.tool.name]: { tool: workflowTools.get.tool, minPrincipal: "system", handle: workflowTools.get.handle },
+  [workflowTools.update.tool.name]: { tool: workflowTools.update.tool, minPrincipal: "system", handle: workflowTools.update.handle },
+  [workflowTools.remove.tool.name]: { tool: workflowTools.remove.tool, minPrincipal: "system", handle: workflowTools.remove.handle },
+  [workflowTools.runNow.tool.name]: { tool: workflowTools.runNow.tool, minPrincipal: "system", handle: workflowTools.runNow.handle },
+  [workflowTools.listRuns.tool.name]: { tool: workflowTools.listRuns.tool, minPrincipal: "system", handle: workflowTools.listRuns.handle },
+  [workflowTools.getRun.tool.name]: { tool: workflowTools.getRun.tool, minPrincipal: "system", handle: workflowTools.getRun.handle },
 };
 
 export function principalAllowed(
