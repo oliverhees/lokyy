@@ -22,6 +22,7 @@ export type NodeType =
   | "value"
   | "llm-call"
   | "hermes-agent"
+  | "lokyy-agent"
   | "dashboard.save_data"
   | "branch";
 
@@ -31,6 +32,7 @@ export const NODE_TYPES: NodeType[] = [
   "value",
   "llm-call",
   "hermes-agent",
+  "lokyy-agent",
   "dashboard.save_data",
   "branch",
 ];

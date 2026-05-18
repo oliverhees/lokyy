@@ -9,6 +9,7 @@ import { conversations } from "./api/conversations.ts";
 import { activity } from "./api/activity.ts";
 import { dashboards } from "./api/dashboards.ts";
 import { workflows } from "./api/workflows.ts";
+import { lokyyAgents } from "./api/lokyy-agents.ts";
 
 const app = new Hono();
 
@@ -138,6 +139,13 @@ const workflowsApp = new Hono();
 workflowsApp.use("*", requireAuth);
 workflowsApp.route("/", workflows);
 app.route("/api/lokyy/workflows", workflowsApp);
+
+// Lokyy-Agents (Phase-5.5) — user-creatable agents distinct from
+// /api/lokyy/agents (Hermes-Profiles, read-only).
+const lokyyAgentsApp = new Hono();
+lokyyAgentsApp.use("*", requireAuth);
+lokyyAgentsApp.route("/", lokyyAgents);
+app.route("/api/lokyy/lokyy-agents", lokyyAgentsApp);
 
 // Phase-1d stub endpoints — sidebar routes call these on mount.
 // Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).

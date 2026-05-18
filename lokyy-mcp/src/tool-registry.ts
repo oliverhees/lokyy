@@ -16,6 +16,7 @@ import * as DraftChat from "./system-skills/DashboardBuilder/draft-chat.ts";
 import * as FromDraft from "./system-skills/DashboardBuilder/from-draft.ts";
 import * as Producer from "./system-skills/Producer/index.ts";
 import { tools as workflowTools } from "./system-skills/Workflow/index.ts";
+import { tools as lokyyAgentTools } from "./system-skills/LokyyAgent/index.ts";
 
 export type ToolEntry = {
   tool: Tool;
@@ -67,6 +68,12 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
   [workflowTools.runNow.tool.name]: { tool: workflowTools.runNow.tool, minPrincipal: "system", handle: workflowTools.runNow.handle },
   [workflowTools.listRuns.tool.name]: { tool: workflowTools.listRuns.tool, minPrincipal: "system", handle: workflowTools.listRuns.handle },
   [workflowTools.getRun.tool.name]: { tool: workflowTools.getRun.tool, minPrincipal: "system", handle: workflowTools.getRun.handle },
+  // Lokyy-Agents (Phase-5.5) — user-creatable agents
+  [lokyyAgentTools.list.tool.name]: { tool: lokyyAgentTools.list.tool, minPrincipal: "system", handle: lokyyAgentTools.list.handle },
+  [lokyyAgentTools.get.tool.name]: { tool: lokyyAgentTools.get.tool, minPrincipal: "system", handle: lokyyAgentTools.get.handle },
+  [lokyyAgentTools.create.tool.name]: { tool: lokyyAgentTools.create.tool, minPrincipal: "system", handle: lokyyAgentTools.create.handle },
+  [lokyyAgentTools.update.tool.name]: { tool: lokyyAgentTools.update.tool, minPrincipal: "system", handle: lokyyAgentTools.update.handle },
+  [lokyyAgentTools.remove.tool.name]: { tool: lokyyAgentTools.remove.tool, minPrincipal: "system", handle: lokyyAgentTools.remove.handle },
 };
 
 export function principalAllowed(
