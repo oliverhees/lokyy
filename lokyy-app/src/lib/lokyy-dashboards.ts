@@ -55,6 +55,35 @@ export async function getDashboardData(id: string, date?: string): Promise<Dashb
   return (await r.json()) as DashboardData
 }
 
+export async function updateDashboard(
+  id: string,
+  patch: { schedule?: string; title?: string; originalIntent?: string },
+): Promise<DashboardDetail> {
+  const r = await fetch(`${BASE}/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '')
+    throw new Error(`updateDashboard: HTTP ${r.status} ${txt}`)
+  }
+  const data = (await r.json()) as { dashboard: DashboardDetail }
+  return data.dashboard
+}
+
+export async function deleteDashboard(id: string): Promise<void> {
+  const r = await fetch(`${BASE}/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+  })
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '')
+    throw new Error(`deleteDashboard: HTTP ${r.status} ${txt}`)
+  }
+}
+
 export async function runDashboardNow(id: string): Promise<{ ok: true; runDate: string; itemCount: number }> {
   const r = await fetch(`${BASE}/${encodeURIComponent(id)}/run`, {
     method: 'POST',
