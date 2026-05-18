@@ -5,10 +5,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { listDashboards, createDashboardFromIntent, type DashboardListItem } from '@/lib/lokyy-dashboards'
+import { listDashboards, type DashboardListItem } from '@/lib/lokyy-dashboards'
+import { DashboardArtifactWizard } from '@/components/lokyy/dashboard-artifact-wizard'
 
 export const Route = createFileRoute('/_authed/dashboards/')({
   component: DashboardsListPage,
@@ -30,9 +28,7 @@ function formatRunDate(isoDate: string): string {
 function DashboardsListPage() {
   const [dashboards, setDashboards] = useState<DashboardListItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [intent, setIntent] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [wizardOpen, setWizardOpen] = useState(false)
   const navigate = useNavigate()
 
   function reload() {
@@ -47,19 +43,9 @@ function DashboardsListPage() {
   }
   useEffect(reload, [])
 
-  async function submit() {
-    if (intent.trim().length < 3 || creating) return
-    setCreating(true)
-    try {
-      const result = await createDashboardFromIntent(intent.trim())
-      setDialogOpen(false)
-      setIntent('')
-      navigate({ to: '/dashboards/$id', params: { id: result.dashboardId } })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setCreating(false)
-    }
+  function onWizardCreated(id: string) {
+    setWizardOpen(false)
+    navigate({ to: '/dashboards/$id', params: { id } })
   }
 
   return (
@@ -71,51 +57,15 @@ function DashboardsListPage() {
             Selbstgebaute Dashboards — agentengetrieben, mit Historie. Chatte deinen Wunsch und Lokyy bastelt die View + den Producer-Skill.
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="dashboards-create">
-              <PlusIcon className="size-4" />
-              Neues Dashboard
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Neues Dashboard erstellen</DialogTitle>
-              <DialogDescription>
-                Beschreibe in einem Satz was du sehen willst. Lokyy wählt die passende Vorlage und legt einen Producer an.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="intent">Intent</Label>
-              <Input
-                id="intent"
-                data-testid="dashboards-intent-input"
-                placeholder="z.B. KI-News täglich um 8 Uhr"
-                value={intent}
-                onChange={(e) => setIntent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    submit()
-                  }
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                Vorlagen heute: KI-News, Email-Digest. Weitere kommen mit dem LLM-Generator.
-              </p>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setDialogOpen(false)}>Abbrechen</Button>
-              <Button
-                onClick={submit}
-                disabled={intent.trim().length < 3 || creating}
-                data-testid="dashboards-create-submit"
-              >
-                {creating ? 'Wird erstellt…' : 'Erstellen'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button data-testid="dashboards-create" onClick={() => setWizardOpen(true)}>
+          <PlusIcon className="size-4" />
+          Neues Dashboard
+        </Button>
+        <DashboardArtifactWizard
+          open={wizardOpen}
+          onOpenChange={setWizardOpen}
+          onCreated={onWizardCreated}
+        />
       </div>
 
       {error && (

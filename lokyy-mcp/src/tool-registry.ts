@@ -12,6 +12,8 @@ import type { Principal } from "./auth.ts";
 import { recordUse } from "./capabilities.ts";
 import * as DashboardBuilder from "./system-skills/DashboardBuilder/index.ts";
 import * as SaveDashboardData from "./system-skills/DashboardBuilder/save-data.ts";
+import * as DraftChat from "./system-skills/DashboardBuilder/draft-chat.ts";
+import * as FromDraft from "./system-skills/DashboardBuilder/from-draft.ts";
 import * as Producer from "./system-skills/Producer/index.ts";
 
 export type ToolEntry = {
@@ -42,6 +44,18 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     // external APIs. System-only until we have per-user policy.
     minPrincipal: "system",
     handle: Producer.handle,
+  },
+  [DraftChat.tool.name]: {
+    tool: DraftChat.tool,
+    // LLM costs $ — gate to system bearer (proxied by lokyy-os-be).
+    minPrincipal: "system",
+    handle: DraftChat.handle,
+  },
+  [FromDraft.tool.name]: {
+    tool: FromDraft.tool,
+    // Persists a dashboard from a draft — same privilege as create_via_builder.
+    minPrincipal: "system",
+    handle: FromDraft.handle,
   },
 };
 
