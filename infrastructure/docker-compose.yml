@@ -336,6 +336,11 @@ services:
     environment:
       - PORT=7878
       - LOKYY_SYSTEM_SECRET=${LOKYY_SYSTEM_SECRET}
+      # Cron schedules in producer.json are interpreted in this timezone.
+      - TZ=${LOKYY_CRON_TZ:-Europe/Berlin}
+      # Chat-Wizard tools call Hermes /v1/chat/completions.
+      - HERMES_BASE_URL=${HERMES_BASE_URL:-http://hermes:8642}
+      - HERMES_API_KEY=${HERMES_API_KEY:-}
     volumes:
       # Shared with lokyy-os-be + lokyy-supervisor. Capability-store +
       # audit-log live here (Phase-3 will move them to lokyy-brain).

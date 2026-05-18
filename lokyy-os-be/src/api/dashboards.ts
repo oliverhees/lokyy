@@ -159,6 +159,65 @@ dashboards.get("/:id/data", (c) => {
   }
 });
 
+// Iterative draft-chat: each call is one turn. FE sends conversation
+// history + optional current draft; backend proxies to lokyy-mcp's
+// draft_chat tool which calls Hermes. Response is one of:
+//   { kind: "message", message }                  — clarifying question
+//   { kind: "draft" | "final", message, spec, view_html }
+dashboards.post("/draft-chat", async (c) => {
+  ensureSecret();
+  const body = (await c.req.json().catch(() => ({}))) as unknown;
+  const r = await fetch(`${MCP_URL}/tools/lokyy.dashboards.draft_chat/invoke`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SYSTEM_SECRET}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = (await r.json()) as
+    | { ok: true; result: unknown }
+    | { ok: false; error: string };
+  if (!data.ok) return c.json({ error: data.error }, 502);
+  return c.json(data.result);
+});
+
+// Persist a finalized draft as a real dashboard.
+dashboards.post("/from-draft", async (c) => {
+  ensureSecret();
+  const body = (await c.req.json().catch(() => ({}))) as unknown;
+  const r = await fetch(
+    `${MCP_URL}/tools/lokyy.dashboards.create_from_draft/invoke`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SYSTEM_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  const data = (await r.json()) as
+    | {
+        ok: true;
+        result: {
+          dashboardId: string;
+          template: string;
+          producer: unknown;
+        };
+      }
+    | { ok: false; error: string };
+  if (!data.ok) return c.json({ error: data.error }, 502);
+  // Strip producer.capabilityBearer from the response — never to the browser.
+  return c.json(
+    {
+      dashboardId: data.result.dashboardId,
+      template: data.result.template,
+    },
+    201
+  );
+});
+
 dashboards.post("/from-intent", async (c) => {
   ensureSecret();
   const body = (await c.req.json().catch(() => ({}))) as { intent?: string };

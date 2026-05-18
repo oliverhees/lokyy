@@ -114,3 +114,53 @@ export async function createDashboardFromIntent(intent: string): Promise<{ dashb
 export function dashboardViewUrl(id: string): string {
   return `${BASE}/${encodeURIComponent(id)}/view`
 }
+
+// ─── Phase-4.7 — iterative artifact wizard ────────────────────────────────
+
+export type ChatTurn = { role: 'user' | 'assistant'; content: string }
+export type DraftSpec = {
+  title: string
+  intent: string
+  template: 'ki-news' | 'email-digest'
+  schedule: string
+}
+export type Draft = { spec: DraftSpec; view_html: string }
+
+export type DraftChatResponse =
+  | { kind: 'message'; message: string }
+  | { kind: 'draft'; message: string; spec: DraftSpec; view_html: string }
+  | { kind: 'final'; message: string; spec: DraftSpec; view_html: string }
+
+export async function draftChat(
+  messages: ChatTurn[],
+  currentDraft?: Draft,
+): Promise<DraftChatResponse> {
+  const r = await fetch(`${BASE}/draft-chat`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, currentDraft }),
+  })
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '')
+    throw new Error(`draftChat: HTTP ${r.status} ${txt}`)
+  }
+  return (await r.json()) as DraftChatResponse
+}
+
+export async function createFromDraft(
+  spec: DraftSpec,
+  view_html: string,
+): Promise<{ dashboardId: string; template: string }> {
+  const r = await fetch(`${BASE}/from-draft`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ spec, view_html }),
+  })
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '')
+    throw new Error(`createFromDraft: HTTP ${r.status} ${txt}`)
+  }
+  return (await r.json()) as { dashboardId: string; template: string }
+}
