@@ -224,6 +224,99 @@ const hermesAgent: NodeExecutor = async (config, inputs) => {
   return { content, profile, raw: data };
 };
 
+// ─── lokyy-agent ───────────────────────────────────────────────────────────
+// Runs a user-created Lokyy-Agent. The agent's curated skills are
+// injected into the system-prompt as context so the underlying Hermes
+// run knows what behaviors are expected of it.
+//
+// Config:
+//   - agentId:    string (required) — Lokyy-Agent id
+//   - userPrompt: string (required) — supports {{nodeId}} placeholders
+// Returns: { content, agentId, raw }
+import { readAgent } from "../LokyyAgent/index.ts";
+
+const HERMES_DASHBOARD_URL =
+  process.env.HERMES_DASHBOARD_URL ?? "http://hermes-dashboard:9119";
+
+/** Fetch a single Hermes-Skill's metadata. Used to enrich the system
+ *  prompt with descriptions of the skills the agent has access to.
+ *  Skill markdown content is intentionally NOT fetched (would balloon
+ *  tokens) — descriptions are enough for the LLM to behave. */
+async function fetchSkillDescriptions(
+  skillNames: string[]
+): Promise<Array<{ name: string; description: string }>> {
+  if (skillNames.length === 0) return [];
+  try {
+    // hermes-dashboard /api/skills returns the full list — filter locally
+    const r = await fetch(`${HERMES_DASHBOARD_URL}/api/skills`);
+    if (!r.ok) return skillNames.map((n) => ({ name: n, description: "" }));
+    const all = (await r.json()) as Array<{ name: string; description?: string }>;
+    const byName = new Map(all.map((s) => [s.name, s.description ?? ""]));
+    return skillNames.map((n) => ({ name: n, description: byName.get(n) ?? "" }));
+  } catch {
+    return skillNames.map((n) => ({ name: n, description: "" }));
+  }
+}
+
+const lokyyAgent: NodeExecutor = async (config, inputs) => {
+  const agentId = config.agentId;
+  const userPrompt = config.userPrompt;
+  if (typeof agentId !== "string" || agentId.length < 1) {
+    throw new Error("lokyy-agent: config.agentId required");
+  }
+  if (typeof userPrompt !== "string" || userPrompt.length < 1) {
+    throw new Error("lokyy-agent: config.userPrompt required");
+  }
+  const agent = readAgent(agentId);
+  if (!agent) throw new Error(`lokyy-agent: agent '${agentId}' not found`);
+
+  // Build the enriched system prompt: agent's own prompt + skill context.
+  const skillDescriptions = await fetchSkillDescriptions(agent.skills);
+  const skillSection =
+    skillDescriptions.length > 0
+      ? "\n\n# Verfügbare Skills (verhalte dich entsprechend):\n" +
+        skillDescriptions
+          .map((s) => `- **${s.name}**${s.description ? `: ${s.description}` : ""}`)
+          .join("\n")
+      : "";
+  const mcpHint =
+    agent.mcps.length > 0
+      ? "\n\n# MCPs zugeordnet (v1 informational): " + agent.mcps.join(", ")
+      : "";
+  const systemPrompt = (agent.systemPrompt || "") + skillSection + mcpHint;
+
+  const messages = [
+    ...(systemPrompt.trim() ? [{ role: "system", content: systemPrompt }] : []),
+    { role: "user", content: interpolate(userPrompt, inputs) },
+  ];
+
+  const r = await fetch(`${HERMES_BASE_URL}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(HERMES_API_KEY ? { Authorization: `Bearer ${HERMES_API_KEY}` } : {}),
+    },
+    body: JSON.stringify({
+      model: agent.model,
+      messages,
+      stream: false,
+      temperature: 0.4,
+    }),
+  });
+  if (!r.ok) {
+    throw new Error(`lokyy-agent: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+  }
+  const data = (await r.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content ?? "";
+  return {
+    content,
+    agentId,
+    agentName: agent.name,
+    skillsUsed: agent.skills,
+    raw: data,
+  };
+};
+
 // ─── Registry ──────────────────────────────────────────────────────────────
 
 export const NODE_EXECUTORS: Record<string, NodeExecutor> = {
@@ -232,8 +325,9 @@ export const NODE_EXECUTORS: Record<string, NodeExecutor> = {
   "http-fetch": httpFetch,
   "llm-call": llmCall,
   "hermes-agent": hermesAgent,
+  "lokyy-agent": lokyyAgent,
   "dashboard.save_data": dashboardSaveData,
-  // Phase-5.x adds: 'branch' (true/false handles), 'hermes-skill'
+  // Phase-5.x adds: 'branch' (true/false handles), 'lokyy-skill', 'json-extract'
 };
 
 export function isKnownNodeType(t: string): boolean {

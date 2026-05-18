@@ -38,6 +38,7 @@ import {
   BrainCircuitIcon,
 } from 'lucide-react'
 import { listAgents, type Agent } from '@/lib/lokyy-agents'
+import { listMyAgents, type LokyyAgent } from '@/lib/lokyy-my-agents'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -106,12 +107,23 @@ const NODE_META: Record<
   'hermes-agent': {
     icon: BrainCircuitIcon,
     color: 'border-fuchsia-500/40 bg-fuchsia-500/10',
-    label: 'Hermes Agent',
+    label: 'System Agent',
     category: 'agent',
     summary: (c) => {
       const profile = typeof c.profile === 'string' ? c.profile : '(profile?)'
       const p = typeof c.userPrompt === 'string' ? c.userPrompt : ''
       return `${profile} · ${p.slice(0, 40)}${p.length > 40 ? '…' : ''}`
+    },
+  },
+  'lokyy-agent': {
+    icon: BrainCircuitIcon,
+    color: 'border-violet-500/40 bg-violet-500/10',
+    label: 'Lokyy Agent',
+    category: 'agent',
+    summary: (c) => {
+      const agentId = typeof c.agentId === 'string' ? c.agentId : '(agent?)'
+      const p = typeof c.userPrompt === 'string' ? c.userPrompt : ''
+      return `${agentId} · ${p.slice(0, 40)}${p.length > 40 ? '…' : ''}`
     },
   },
   'dashboard.save_data': {
@@ -560,8 +572,10 @@ function NodePanel({
   const supportsTemplates =
     editing.spec.type === 'llm-call' ||
     editing.spec.type === 'hermes-agent' ||
+    editing.spec.type === 'lokyy-agent' ||
     editing.spec.type === 'dashboard.save_data'
   const isHermesAgent = editing.spec.type === 'hermes-agent'
+  const isLokyyAgent = editing.spec.type === 'lokyy-agent'
 
   return (
     <>
@@ -594,6 +608,7 @@ function NodePanel({
         </div>
 
         {isHermesAgent && <HermesAgentPicker editing={editing} onChange={onChange} />}
+        {isLokyyAgent && <LokyyAgentPicker editing={editing} onChange={onChange} />}
 
         {supportsTemplates && (
           <div className="rounded-md border bg-muted/30 p-3 space-y-2">
@@ -767,6 +782,102 @@ function HermesAgentPicker({
   )
 }
 
+// ─── Lokyy Agent Picker ────────────────────────────────────────────────────
+
+function LokyyAgentPicker({
+  editing,
+  onChange,
+}: {
+  editing: EditingState
+  onChange: (next: EditingState) => void
+}) {
+  const [agents, setAgents] = useState<LokyyAgent[] | null>(null)
+  useEffect(() => {
+    listMyAgents()
+      .then(setAgents)
+      .catch(() => setAgents([]))
+  }, [])
+
+  const currentId = (() => {
+    try {
+      const c = JSON.parse(editing.configText) as { agentId?: string }
+      return typeof c.agentId === 'string' ? c.agentId : ''
+    } catch {
+      return ''
+    }
+  })()
+  const selected = agents?.find((a) => a.id === currentId) ?? null
+
+  function setAgentId(agentId: string) {
+    let c: Record<string, unknown> = {}
+    try {
+      c = JSON.parse(editing.configText)
+    } catch {
+      // keep defaults
+    }
+    c.agentId = agentId
+    onChange({
+      ...editing,
+      configText: JSON.stringify(c, null, 2),
+      configError: null,
+    })
+  }
+
+  return (
+    <div className="rounded-md border bg-violet-500/5 border-violet-500/30 p-3 space-y-2" data-testid="lokyy-agent-picker">
+      <div className="flex items-center gap-1.5 text-xs">
+        <BrainCircuitIcon className="size-3 text-violet-500" />
+        <span className="font-semibold">Lokyy Agent (custom)</span>
+      </div>
+
+      {agents === null ? (
+        <p className="text-[10px] text-muted-foreground italic">lade Agents…</p>
+      ) : agents.length === 0 ? (
+        <p className="text-[10px] text-muted-foreground italic">
+          Noch kein Lokyy-Agent angelegt. Geh zu <code className="font-mono">/agents</code> → «Neuer Agent».
+        </p>
+      ) : (
+        <select
+          className="w-full rounded-md border bg-background px-2 py-1.5 text-xs font-mono"
+          value={currentId}
+          onChange={(e) => setAgentId(e.target.value)}
+          data-testid="lokyy-agent-picker-select"
+        >
+          <option value="">— Agent wählen —</option>
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} ({a.skills.length} skills)
+            </option>
+          ))}
+        </select>
+      )}
+
+      {selected && (
+        <div className="text-[10px] text-muted-foreground space-y-0.5">
+          {selected.description && <div className="italic line-clamp-2">{selected.description}</div>}
+          <div>
+            <span className="opacity-60">Model:</span>{' '}
+            <code className="font-mono">{selected.model}</code>
+            <span className="opacity-60 mx-1">·</span>
+            {selected.skills.length} Skills
+            {selected.mcps.length > 0 && <span> · {selected.mcps.length} MCPs</span>}
+          </div>
+          {selected.skills.length > 0 && (
+            <div className="opacity-70 line-clamp-1">
+              <span className="opacity-60">Skills:</span> {selected.skills.join(', ')}
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="text-[10px] text-muted-foreground pt-1">
+        Der Agent läuft mit seinem System-Prompt + Skill-Descriptions als Kontext. Output kommt im{' '}
+        <code className="font-mono">content</code>-Feld.
+      </p>
+    </div>
+  )
+}
+
 function defaultConfigFor(type: string): Record<string, unknown> {
   switch (type) {
     case 'value':
@@ -783,6 +894,11 @@ function defaultConfigFor(type: string): Record<string, unknown> {
         profile: 'default',
         systemPrompt: '',
         userPrompt: 'Beantworte: {{previousNode}}',
+      }
+    case 'lokyy-agent':
+      return {
+        agentId: '',
+        userPrompt: 'Bearbeite: {{previousNode}}',
       }
     case 'dashboard.save_data':
       return { dashboardId: 'replace-with-dashboard-id', payload: { items: [] } }
@@ -801,6 +917,8 @@ function configHelp(type: string): string {
       return 'Felder: userPrompt (required), systemPrompt, model, temperature. Variablen siehe oben.'
     case 'hermes-agent':
       return 'Felder: profile (required — Hermes-Profilname), userPrompt (required), systemPrompt, temperature. Output enthält content + profile + raw Response.'
+    case 'lokyy-agent':
+      return 'Felder: agentId (required — Lokyy-Agent-id), userPrompt (required). Agent läuft mit seinem konfigurierten System-Prompt + injected Skill-Beschreibungen. Output: content + agentId + agentName + skillsUsed.'
     case 'dashboard.save_data':
       return 'Felder: dashboardId (required), payload (object oder Variable). Wenn payload weggelassen + 1 upstream-node, dessen output wird verwendet.'
     case 'manual-trigger':
