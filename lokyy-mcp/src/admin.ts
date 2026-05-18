@@ -12,6 +12,7 @@ import {
   revokeCapability,
   type CapabilityScope,
 } from "./capabilities.ts";
+import { currentJobs } from "./cron.ts";
 
 const ALLOWED_SCOPES: CapabilityScope[] = ["lokyy.dashboards.save_data"];
 
@@ -83,3 +84,11 @@ admin.delete("/capabilities/:tokenId", (c) => {
 // (Direct tool invocation moved to /tools/:name/invoke — accepts both
 // System and Capability bearers; per-tool privilege check happens in
 // the registry.)
+
+admin.get("/cron", (c) => {
+  const jobs = currentJobs().map((j) => ({
+    ...j,
+    lastFiredAt: j.lastFiredAt ? new Date(j.lastFiredAt).toISOString() : null,
+  }));
+  return c.json({ jobs, total: jobs.length });
+});

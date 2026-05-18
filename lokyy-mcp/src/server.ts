@@ -26,6 +26,7 @@ import { requireBearer, getPrincipal, type Principal } from "./auth.ts";
 import { admin } from "./admin.ts";
 import { toolsHttp } from "./tools-http.ts";
 import { listToolsFor, invokeTool } from "./tool-registry.ts";
+import { startCron } from "./cron.ts";
 
 const PORT = Number(process.env.PORT ?? 7878);
 const SERVICE_NAME = "lokyy-mcp";
@@ -209,6 +210,9 @@ app.route("/tools", toolsHttp);
 console.log(
   `[lokyy-mcp] listening on :${PORT} — service=${SERVICE_NAME} v${SERVICE_VERSION}`
 );
+
+// Phase-4.5 (ISC-91 full): start the in-process dashboard cron.
+startCron();
 
 export default {
   port: PORT,
