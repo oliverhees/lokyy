@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { getWorkflow, runWorkflowNow, listWorkflowRuns, getWorkflowRun, deleteWorkflow, type WorkflowSpec, type WorkflowRunRecord } from '@/lib/lokyy-workflows'
+import { getWorkflow, runWorkflowNow, listWorkflowRuns, getWorkflowRun, deleteWorkflow, updateWorkflow, type WorkflowSpec, type WorkflowRunRecord } from '@/lib/lokyy-workflows'
+import { WorkflowEditor } from '@/components/lokyy/workflow-editor'
 
 export const Route = createFileRoute('/_authed/workflows/$id')({
   loader: async ({ params }) => {
@@ -111,28 +112,15 @@ function WorkflowDetailPage() {
 
       <div className="grid gap-4 md:grid-cols-[1fr_320px]">
         <div className="space-y-4">
-          <Card data-testid="workflow-nodes-card">
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <ZapIcon className="size-4" />
-                Nodes ({spec.nodes.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {spec.nodes.length === 0 && (
-                <p className="text-sm text-muted-foreground italic">Keine Nodes. Editor kommt in Phase-5.2.</p>
-              )}
-              {spec.nodes.map((n) => (
-                <div key={n.id} className="flex items-center justify-between rounded-md border p-3" data-testid={`workflow-node-${n.id}`}>
-                  <div>
-                    <div className="font-mono text-sm">{n.id}</div>
-                    <div className="text-xs text-muted-foreground">{n.type}</div>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">{Object.keys(n.config ?? {}).length} cfg</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <div data-testid="workflow-nodes-card">
+            <WorkflowEditor
+              spec={spec}
+              onSave={async (next) => {
+                const updated = await updateWorkflow(spec.id, next)
+                setSpec(updated.spec)
+              }}
+            />
+          </div>
 
           {activeRun && (
             <Card data-testid="workflow-active-run">
