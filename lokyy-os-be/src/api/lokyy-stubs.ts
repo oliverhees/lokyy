@@ -96,10 +96,10 @@ lokyyStubs.post("/agents/:agentId/mcps/:mcpId/toggle", (c) =>
 // ─────────────────────────────────────────────────────────────────────────────
 // Tasks / Jobs / Sessions
 // ─────────────────────────────────────────────────────────────────────────────
-
-lokyyStubs.get("/tasks", (c) =>
-  c.json({ tasks: [], columns: ["todo", "in_progress", "done"] })
-);
+//
+// NOTE: /tasks moved to a dedicated router (src/api/tasks.ts) that proxies
+// hermes-dashboard /api/plugins/kanban/board. The Phase-1d "Hermes-Kanban
+// nicht initialisiert" stub was a bug — see Issue #113.
 
 lokyyStubs.get("/jobs", (c) =>
   c.json({ jobs: [] })
