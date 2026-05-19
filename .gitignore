@@ -1,7 +1,15 @@
 # ====================================================================
 # Lokyy outer mono-repo .gitignore
-# See docs/decisions/ADR-001-lokyy-workspace-integration.md
 # ====================================================================
+
+# Internal development + AI-assistant artifacts. Kept locally so
+# Claude-Code, BMAD agents and the diary workflow keep working, but
+# excluded from the public-facing repo.
+/CLAUDE.md
+/ISA.md
+/LOKYY.md
+/LOKYY-ETAPPE-1-RESKIN.md
+/docs/
 
 # Inner workspace fork — lives as an independent repo at this path
 # Cloned via `git clone https://github.com/outsourc-e/hermes-workspace.git lokyy-workspace`

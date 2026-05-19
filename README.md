@@ -1,101 +1,144 @@
 # Lokyy KI-OS
 
-> **Dein eigenes KI-Betriebssystem auf deinem eigenen Server.** Tasks, Agents, Workflows, Tools, Memory — alles unter deiner Kontrolle, alle Daten bei dir.
+> **Dein eigenes KI-Betriebssystem auf deinem eigenen Server.** Hermes-Agent + Workflows + Tasks + Memory + Tools — alles in einem Stack, alle Daten bei dir.
 
 ![status](https://img.shields.io/badge/status-personal--beta-blueviolet) ![license](https://img.shields.io/badge/license-AGPL--3.0-blue)
 
-Lokyy ist ein selbst-gehostetes KI-Betriebssystem, gebaut auf [Hermes Agent](https://github.com/nousresearch/hermes-agent). Du bekommst:
+---
 
-- 🧠 **Chat mit echten KI-Agenten** (Claude, GPT, OpenRouter — du wählst)
-- 📋 **Schedule-Jobs** — Cron-getriggerte Hermes-Prompts (z.B. "fasse jeden Morgen meine Emails zusammen")
-- 📝 **Prompt-Library** + **Teams** — wiederverwendbare Prompts + Multi-Agent-Konfigurationen
+## ⚡ Was das ist
+
+Lokyy ist ein **selbst-gehostetes KI-Betriebssystem** rund um [Hermes Agent](https://github.com/NousResearch/hermes-agent). Du klonst ein Repo, lässt einen Wizard laufen, öffnest den Browser — und hast deinen eigenen KI-Stack inkl. Web-UI, Chat, Agents, Schedule-Jobs und Tools.
+
+**Hermes ist gebundled.** Du musst Hermes nicht separat installieren — Lokyy bringt das Hermes-Image im Docker-Stack mit. Ein Install, ein Stack, neun Container.
+
+## 🎯 Was du bekommst
+
+- 🧠 **Chat** mit echten KI-Agenten (Claude, GPT, OpenRouter, was du willst)
+- 📋 **Schedule-Jobs** — Cron-getriggerte Prompts ("fasse jeden Morgen meine Emails zusammen")
+- 📝 **Prompt-Library** + **Teams** — wiederverwendbare Prompts + Multi-Agent-Mixe
 - 🔧 **24 Tools** ins Hermes-Setup (Web-Search, Code-Execution, Browser, Memory, …)
 - 📊 **Insights-Dashboard** über Token-Verbrauch, Sessions, Tool-Calls
-- 🗂 **Vault** für read-only Anbindung deines Obsidian-Vaults
-- 🛡 **Eigener Server, eigene Daten** — keine Telemetrie, keine SaaS-Bindung
+- 🔗 **Workflows** mit DAG-Editor (Trigger → LLM → Speichern), Cron + Webhook-Trigger
+- 🗂 **Vault-Anbindung** (Obsidian read-only, bis lokyy-brain in Phase-3 landet)
+- 📡 **Channels** — Hermes als Bot in Telegram, Discord, Slack, Matrix, Signal …
+- 🛡 **Deine Daten, deine Maschine** — keine Telemetrie, kein SaaS-Vendor-Lock
 
----
+## 🚀 Quick Start (VPS, ~20 Minuten)
 
-## Was du brauchst
+> **Empfohlener Pfad:** ein günstiger VPS (Hetzner Cloud CX22 ≈ 4 €/Monat oder vergleichbar) mit Ubuntu 24.04 und einer Domain. Home-Server geht auch — siehe weiter unten.
 
-| | |
-|---|---|
-| **Betriebssystem** | Linux (Ubuntu 22.04+, Debian 12+, Fedora 39+) oder macOS. Windows mit WSL2 sollte gehen, ist aber nicht getestet. |
-| **Docker** | Engine 24.x oder neuer + das Compose-Plugin. → [Install-Guide](https://docs.docker.com/engine/install/) |
-| **RAM** | Mindestens 4 GB frei; 8 GB+ empfohlen |
-| **Disk** | ~5 GB für Container-Images + Platz für deine Daten |
-| **Ein LLM-Provider-Key** | OpenRouter, Anthropic ODER OpenAI — du brauchst nur einen. (OpenRouter hat einen Free-Tier zum Ausprobieren.) |
-| **Domain (optional)** | Für lokale Installation reicht `lokyy.local`. Für "richtige" Installation mit Let's-Encrypt brauchst du eine Domain die auf den Server zeigt. |
+### Phase 1 — Server provisionieren (lokal + Hetzner-Konsole)
 
----
+1. SSH-Key erzeugen, falls du noch keinen hast:
+   ```bash
+   ssh-keygen -t ed25519 -C "deine-email@example.com" -f ~/.ssh/id_ed25519_lokyy
+   ```
+2. **Hetzner-Konsole** (oder dein bevorzugter Cloud-Provider):
+   - Public-Key (`~/.ssh/id_ed25519_lokyy.pub`) hochladen
+   - **Firewall** mit eingehend `22/tcp` (SSH), `80/tcp` (HTTP) und `443/tcp` (HTTPS) anlegen
+   - Server bestellen: Ubuntu 24.04 LTS, CX22 (2 vCPU, 4 GB RAM, 40 GB SSD)
+3. Server-IP notieren. Per SSH testweise einloggen: `ssh root@<server-ip>`
 
-## Installation in 5 Minuten
+### Phase 2 — DNS-A-Record
 
-### 1. Repository klonen
+Beim Domain-Registrar (Cloudflare, INWX, Namecheap …) drei A-Records auf die Server-IP zeigen lassen:
+
+```
+lokyy.deine-domain.de        →  <server-ip>
+traefik.deine-domain.de      →  <server-ip>
+hermes.deine-domain.de       →  <server-ip>
+```
+
+DNS-Propagation prüfen: `dig +short lokyy.deine-domain.de` — sollte deine Server-IP zurückgeben (5-30 min nach Anlage).
+
+### Phase 3 — Server vorbereiten (Server, als sudo-fähiger User)
+
+> Falls du nur einen `root`-Account hast: lege zuerst einen sudo-User an. Schnellrezept als root:
+> ```bash
+> adduser oliver
+> usermod -aG sudo oliver
+> rsync --archive --chown=oliver:oliver ~/.ssh /home/oliver
+> ```
+> Dann `exit` und neu einloggen: `ssh oliver@<server-ip>`.
 
 ```bash
+# Repo klonen
 git clone https://github.com/oliverhees/lokyy.git
+cd lokyy
+
+# Docker + Compose installieren (ein Befehl)
+bash scripts/install-docker.sh
+
+# Aus + wieder einloggen damit die docker-group greift
+exit
+ssh oliver@<server-ip>
 cd lokyy
 ```
 
-### 2. Setup-Wizard starten
+### Phase 4 — Lokyy installieren
 
 ```bash
-./scripts/install-lokyy.sh
+bash scripts/install-lokyy.sh
 ```
 
 Der Wizard fragt dich:
 
-1. **Domain** — bei lokaler Installation einfach `lokyy.local` (default).
-2. **Email** für Let's-Encrypt (nur relevant bei echter Domain).
-3. **Traefik-Dashboard-Passwort** — wähl ein gutes, du brauchst es selten.
-4. **LLM-Provider-Key** — wähle 1–3 (OpenRouter / Anthropic / OpenAI) und füge deinen Key ein. **Genau einen brauchst du.**
+1. **Domain** — `lokyy.deine-domain.de`
+2. **Email** für Let's-Encrypt-Zertifikate
+3. **Traefik-Dashboard-Passwort** — frei wählbar, brauchst du selten
+4. **LLM-Provider-Key** — OpenRouter, Anthropic ODER OpenAI (genau einen)
 
-Der Wizard:
-- ✅ generiert alle internen Secrets automatisch (du musst nichts wissen)
-- ✅ schreibt `infrastructure/.env.local` (privat, `chmod 0600`)
-- ✅ trägt bei `*.local`-Domain auf Wunsch `/etc/hosts` ein (braucht `sudo`)
-- ✅ baut + startet alle Container
-- ✅ wartet bis alles `healthy` ist
+Was er macht:
+- ✅ Alle internen Secrets per `openssl rand -hex 32` generieren
+- ✅ `infrastructure/.env.local` mit `chmod 0600` schreiben
+- ✅ Docker-Compose-Stack bauen (~5-10 min beim ersten Mal)
+- ✅ Container hochfahren + auf `healthy` warten
 
-Beim ersten Start dauert das Bauen ~5–10 Minuten, danach Sekunden.
+### Phase 5 — Fertig
 
-### 3. Lokyy öffnen
+Browser öffnen → `https://lokyy.deine-domain.de` → **Registrieren** klicken → Email + Passwort wählen → das wird dein Lokyy-Admin-Account.
 
-Der Wizard druckt am Ende:
+Du landest auf dem Dashboard. **Done.**
 
-```
-→ App:           https://lokyy.local
-→ Traefik-Dash:  https://traefik.lokyy.local
-→ Hermes-Dash:   https://hermes.lokyy.local
-```
+## 📋 Voraussetzungen
 
-Öffne **https://lokyy.local** im Browser.
+| | |
+|---|---|
+| **Server-OS** | Ubuntu 22.04 LTS oder 24.04 LTS (Debian 12 sollte gehen, ist aber nicht getestet) |
+| **RAM** | min. 4 GB |
+| **Disk** | min. 20 GB frei nach OS-Install |
+| **Domain** | Eine Domain die du selbst kontrollierst (für Let's-Encrypt-Zertifikate) |
+| **LLM-Provider-Key** | OpenRouter (Free-Tier verfügbar), Anthropic oder OpenAI — genau einen brauchst du |
+| **Lokal** | `ssh`, `git` — sonst nichts |
 
-- Bei `*.local`-Domain wird das Zertifikat **selbstsigniert** sein → Warnung akzeptieren.
-- Auf der Login-Seite auf **„Registrieren"** klicken
-- Email + Passwort wählen → das wird dein Lokyy-Admin-Account
+## 🏠 Alternative: Home-Server / LAN-only
 
-Fertig. Du landest auf dem Dashboard.
+Wenn du keinen Cloud-Server willst, sondern auf einem Rechner zuhause hosten möchtest:
 
----
+### Pfad A — Echte Domain mit Port-Forward
+- Domain holen, DNS auf deine **öffentliche** IP zeigen lassen
+- Im Router Port-Forward für `80` + `443` zur **lokalen IP** deines Servers
+- Wizard genau wie oben — Let's-Encrypt holt sich das Zertifikat ganz normal
+- DynDNS-Dienst (DuckDNS, no-ip) wenn dein ISP dynamische IPs gibt
 
-## Was du jetzt sehen solltest
+### Pfad B — Tailscale (kein offenes Port, kein Public-DNS)
+- [Tailscale](https://tailscale.com/) auf Server + Client installieren
+- Server bekommt eine `*.ts.net` Adresse → die als `DOMAIN` im Wizard nutzen
+- Zertifikate via Tailscale-Cert (`tailscale cert lokyy.deine-tailnet.ts.net`)
+- Vorteil: nichts ist im Internet, du erreichst Lokyy nur aus dem Tailnet
 
-Direkt nach dem Login:
+### Pfad C — Lokal only (Test / Dev)
+- Im Wizard `DOMAIN=lokyy.local` lassen (Default)
+- Wizard schreibt `/etc/hosts`-Einträge wenn du `y` sagst
+- Zertifikate sind self-signed → Browser warnt → akzeptieren
+- Nur erreichbar **von der Maschine selbst**, nicht aus dem LAN
 
-- **Dashboard** — Sessions, Tasks, Agents, Tools-Counter (am Anfang alles 0, weil noch nichts erstellt)
-- **Chat** — leg los und sprich mit Hermes; die erste Antwort kommt vom Provider den du eingerichtet hast
-- **Tasks** — Hermes-Kanban (4 Spalten: To Do / In Progress / Blocked / Done)
-- **Tools** — 24 Toolsets von Hermes; manche sind enabled, manche brauchen Provider-Keys
-- **Channels** — 14 Messaging-Plattformen die Hermes als Bot bedienen kann (Telegram, Discord, Slack, …); alle initial *disconnected*
-- **Schedule Jobs** — leer; "Neuer Job" → Schedule (z.B. `0 9 * * *` für täglich 9 Uhr) + Prompt → läuft
+## 🗂 Second-Brain / Vault-Anbindung
 
----
+**Geplant:** Lokyy bekommt sein eigenes Second-Brain via `lokyy-brain` (eigenen Hono-Service der gegen ein selbst-gehostetes [Forgejo](https://codeberg.org/forgejo/forgejo) als Markdown-Store schreibt). Das landet in einer der nächsten Phasen — bis dahin ist der `lokyy-brain` Container ein nginx-Placeholder.
 
-## Optional: Obsidian-Vault verbinden
-
-Lokyy kann deinen Obsidian-Vault read-only lesen.
+**Heute (Übergang):** wenn du schon einen Obsidian-Vault hast, kannst du ihn read-only in Lokyy mounten:
 
 1. In `infrastructure/docker-compose.yml` beim `lokyy-os-be`-Service den auskommentierten Volume-Mount aktivieren:
    ```yaml
@@ -103,187 +146,136 @@ Lokyy kann deinen Obsidian-Vault read-only lesen.
      - lokyy-os-db:/app/data
      - /pfad/zu/deinem/obsidian-vault:/vault:ro
    ```
-2. In `infrastructure/.env.local`:
+2. In `infrastructure/.env.local` setzen:
    ```
    LOKYY_VAULT_PATH=/vault
    ```
-3. Container neu starten:
-   ```bash
-   cd infrastructure
-   docker compose --env-file .env.local up -d lokyy-os-be
-   ```
-4. `/vault` im Lokyy-Menü zeigt jetzt deine Markdown-Notes.
+3. `docker compose --env-file .env.local up -d lokyy-os-be`
 
----
+Im Menü unter **Vault** siehst du dann deine Markdown-Notes.
 
-## Optional: Hermes mit Telegram/Discord/Slack verbinden
+## 📡 Hermes mit Telegram / Discord / Slack verbinden
 
-Hermes kann als Bot in Messaging-Plattformen agieren. Setup läuft heute über die Hermes-CLI:
+Hermes kann als Bot in Messaging-Plattformen agieren. Setup über die Hermes-CLI im laufenden Container:
 
 ```bash
-# Im Hermes-Container einloggen
 docker exec -it lokyy-hermes /opt/hermes/.venv/bin/hermes gateway setup
-
-# Folge den interaktiven Prompts (Telegram-Token, Discord-Webhook etc.)
 ```
 
-Nach erfolgreichem Setup taucht die Plattform unter **/channels** als "konfiguriert" auf.
+Du wirst durch Token/Webhook-Config geführt. Nach erfolgreichem Setup taucht die Plattform unter **/channels** als "konfiguriert" auf.
 
----
-
-## Tägliche Bedienung
-
-### Stoppen / Neustarten
+## 🔧 Tägliche Bedienung
 
 ```bash
-cd infrastructure
+cd ~/lokyy/infrastructure
 
-# Stoppen
-docker compose --env-file .env.local stop
-
-# Wieder starten (Images nicht neu bauen)
-docker compose --env-file .env.local up -d
-
-# Einzelnen Service neustarten (z.B. nach env-Änderung)
-docker compose --env-file .env.local restart lokyy-os-be
-```
-
-### Logs anschauen
-
-```bash
-cd infrastructure
-
-# Alle Services
-docker compose --env-file .env.local logs -f
-
-# Nur Backend
-docker compose --env-file .env.local logs -f lokyy-os-be
-
-# Nur Hermes
-docker compose --env-file .env.local logs -f hermes
-```
-
-### Update auf neue Lokyy-Version
-
-```bash
-git pull
-./scripts/install-lokyy.sh   # idempotent, behält bestehende Secrets
-```
-
-Der Wizard erkennt deine bestehende `.env.local` und ändert nur was sich strukturell geändert hat. Deine Daten (Tasks, Jobs, Prompts, Teams) liegen in einem benannten Docker-Volume und bleiben erhalten.
-
-### Backup
-
-```bash
-# Eingebauter Hermes-Backup
-docker exec lokyy-hermes /opt/hermes/.venv/bin/hermes backup
-# legt eine .zip in /opt/data/backups/ ab — schau im Volume nach
-
-# Lokyy-eigene Daten (Tasks, Jobs, Prompts, Teams, Settings)
-docker run --rm -v lokyy-lokyy-os-db:/data -v $(pwd):/backup alpine \
-  tar czf /backup/lokyy-data-$(date +%F).tgz -C /data .
-```
-
----
-
-## Troubleshooting
-
-### "https://lokyy.local antwortet nicht"
-
-```bash
-# Container alle healthy?
-cd infrastructure
+# Status
 docker compose --env-file .env.local ps
 
-# /etc/hosts richtig?
-grep lokyy.local /etc/hosts
-# erwartet: 127.0.0.1 lokyy.local traefik.lokyy.local hermes.lokyy.local
+# Logs (alles)
+docker compose --env-file .env.local logs -f
+
+# Logs nur Backend
+docker compose --env-file .env.local logs -f lokyy-os-be
+
+# Stoppen / Starten
+docker compose --env-file .env.local stop
+docker compose --env-file .env.local up -d
+
+# Update auf neue Version
+cd ~/lokyy
+git pull
+bash scripts/install-lokyy.sh   # idempotent — behält Secrets + Daten
 ```
 
-Wenn die Zeile fehlt → re-run `./scripts/install-lokyy.sh`, beim hosts-Prompt mit `y` bestätigen.
+## 🆘 Troubleshooting
+
+### "https://lokyy.deine-domain.de antwortet nicht"
+
+```bash
+docker compose --env-file ~/lokyy/infrastructure/.env.local ps
+```
+
+Alle Container `healthy`? Wenn nicht → Logs des Übeltäters:
+
+```bash
+docker compose --env-file ~/lokyy/infrastructure/.env.local logs --tail 100 <containername>
+```
+
+Häufigste Ursachen:
+- DNS zeigt noch nicht auf den Server (`dig +short lokyy.deine-domain.de`)
+- Port 80 oder 443 ist nicht erreichbar (Hetzner-Firewall? lokale Firewall?)
+- Let's-Encrypt-Rate-Limit (zu oft neu erstellt) → 1h warten
 
 ### "Chat antwortet nicht"
 
 ```bash
-# Hermes-Logs zeigen den Grund
-docker compose --env-file infrastructure/.env.local logs --tail 50 hermes
+docker compose --env-file ~/lokyy/infrastructure/.env.local logs --tail 80 hermes
 ```
 
 Häufige Ursachen:
-- LLM-Provider-Key falsch / nicht gesetzt → `infrastructure/.env.local` prüfen, dort `OPENROUTER_API_KEY=` / `ANTHROPIC_API_KEY=` / `OPENAI_API_KEY=` muss einen echten Key enthalten
-- Kein Guthaben beim Provider → bei OpenRouter / OpenAI prüfen
-- Netzwerk-Block (Firewall? Proxy?) → `docker exec lokyy-hermes curl -s https://openrouter.ai` testen
+- LLM-Provider-Key falsch / leer → `infrastructure/.env.local` öffnen, `OPENROUTER_API_KEY=` / `ANTHROPIC_API_KEY=` / `OPENAI_API_KEY=` prüfen
+- Kein Guthaben beim Provider
+- Outbound-Block (Firewall?) → `docker exec lokyy-hermes curl -fsSL https://openrouter.ai/api/v1/models | head` testen
 
-### "Settings zeigt ‚lade…' endlos"
+### "Setup-Seite zeigt: 'Already configured'"
 
-Das war ein Bug bis 2026-05-18, in der aktuellen main behoben. Wenn er trotzdem auftritt:
-
-```bash
-docker compose --env-file infrastructure/.env.local logs --tail 30 lokyy-os-be
-```
-
-Wahrscheinlich Hermes nicht erreichbar — siehe „Chat antwortet nicht".
+Du hast schon einen Owner-Account angelegt. Lokyy Personal ist single-tenant — eine Lokyy-Installation = ein User. Auf `/login` gehen und mit deinen Daten anmelden. Passwort vergessen? Schau im Backend-Container in `auth.db` nach (`docker exec lokyy-os-be sqlite3 /app/data/auth.db "SELECT email FROM user"`).
 
 ### "Container bleibt unhealthy"
 
 ```bash
-# Zeigt welcher genau und warum
-docker compose --env-file infrastructure/.env.local ps
-docker inspect --format='{{.State.Health.Status}}: {{.State.Health.Log}}' <containername>
+docker compose --env-file ~/lokyy/infrastructure/.env.local ps
+docker inspect --format='{{.State.Health.Log}}' <containername> | tail -3
 ```
 
 ### Komplett-Neustart von Null
 
 ```bash
-cd infrastructure
-docker compose --env-file .env.local down -v   # !! löscht alle Daten !!
+cd ~/lokyy/infrastructure
+docker compose --env-file .env.local down -v   # !!! löscht alle Daten !!!
 cd ..
-./scripts/install-lokyy.sh
+bash scripts/install-lokyy.sh
 ```
 
----
+## 🗺️ Roadmap
 
-## Architektur (für Neugierige)
+- **Heute:** Auth · Chat · Tasks · Jobs (mit Cron-Runner) · Prompts · Teams · Workflows · Tools · Insights · Channels (Setup-CLI) · Integrations (curated list, OAuth in Phase-6) · Vault (Obsidian read-only)
+- **Phase-3:** `lokyy-brain` als richtiges Second-Brain via Forgejo-Backend
+- **Phase-5.5+:** User-creatable Agents, Skill-as-Workflow-Node, If/Else-Branching, Dashboard-Action-Slots
+- **Phase-6:** OAuth-Flows für Integrations (Google Calendar, Gmail, Notion, Linear, Slack, GitHub)
+- **Phase-9:** Multi-User mit user_id-Scoping (wenn das gewünscht wird — heute ist Single-Owner per Install)
 
-Lokyy besteht aus 9 Containern auf einem geteilten Docker-Netzwerk:
+## 📁 Was im Repo ist
 
-| Service | Was es macht |
-|---|---|
-| `traefik` | Reverse-Proxy + Auto-TLS (Let's-Encrypt oder self-signed) |
-| `lokyy-os-fe` | React-SPA (TanStack Router + Tailwind + xyflow) |
-| `lokyy-os-be` | Bun + Hono Backend; Auth via Better-Auth; sqlite für Lokyy-Daten |
-| `lokyy-mcp` | Lokyy System Bus (System-Skills + Cron-Scheduler) |
-| `lokyy-brain` | Memory-Layer (Phase-3, optional, wenn Forgejo angebunden) |
-| `lokyy-supervisor` | Hermes-Healthcheck-Loop |
-| `hermes` | Hermes Agent (LLM-Gateway, Tool-Runner) |
-| `hermes-dashboard` | Hermes' eigene Web-UI (intern, hinter Traefik) |
-| `docker-socket-proxy` | tecnativa/docker-socket-proxy für sichere Container-Steuerung |
+```
+lokyy/
+├── README.md, LICENSE, NOTICE
+├── scripts/
+│   ├── install-docker.sh        ← Docker-Engine + Compose-Plugin
+│   ├── install-lokyy.sh         ← Lokyy-Wizard (Secrets + Stack-Up)
+│   └── verify-*.ts              ← Playwright-Healthchecks
+├── infrastructure/
+│   ├── docker-compose.yml       ← der ganze Stack (9 Container)
+│   └── .env.example             ← Secret-Template
+├── lokyy-app/                   ← Frontend (React 19 + TanStack Router + Tailwind 4)
+├── lokyy-os-be/                 ← Backend (Bun + Hono + Better-Auth + sqlite)
+└── lokyy-mcp/                   ← System-Bus + Cron-Scheduler
+```
 
-Frontend-Stack: React 19 · TypeScript · Vite · Tailwind 4 · TanStack Router · Zustand · xyflow
-Backend-Stack: Bun · Hono · Better-Auth · bun:sqlite · Kysely
+## 🙏 Credits
 
-Volle Architektur-Doku unter `docs/decisions/ADR-003-docker-topology-etappe-2.md`.
+Lokyy steht auf den Schultern von:
 
----
+- [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) (Nous Research) — der LLM-Gateway + Tool-Runner, MIT
+- [**Hermes Workspace**](https://github.com/outsourc-e/hermes-workspace) (Eric / outsourc-e) — ursprüngliches FE-Scaffold, MIT
+- [**Better-Auth**](https://better-auth.com) — Auth-Layer, MIT
+- [**TanStack Router**](https://tanstack.com/router), **Hono**, **Bun**, **Traefik**, **xyflow**
 
-## Lizenz
+Lokyy wird gepflegt von Oliver Hees + Mitwirkenden — siehe [Contributors](https://github.com/oliverhees/lokyy/graphs/contributors).
 
-**Lokyy — [GNU AGPL-3.0-or-later](LICENSE)** (Affero General Public License v3 oder neuer).
+## 📄 Lizenz
 
-Was das für dich bedeutet:
-- ✅ **Persönlich self-hosten** — erlaubt, ohne Auflagen.
-- ✅ **Lokal modifizieren** — erlaubt, ohne Auflagen.
-- ⚠ **Als SaaS / Online-Service anbieten** (auch eigene Forks) — erlaubt, ABER du musst deinen Source-Code unter AGPL-3.0 verfügbar machen. Das ist die "Affero"-Klausel: SaaS-Hoster müssen Source teilen, anders als bei klassischem GPL.
-- ⚠ **Kommerziell weiterverteilen / einbauen** — erlaubt, aber abgeleitete Werke müssen ebenfalls AGPL-3.0 sein.
+**[GNU AGPL-3.0-or-later](LICENSE).** Selbst-Hosten zur persönlichen Nutzung: erlaubt. Modifizieren: erlaubt. Als SaaS / Online-Service anbieten (auch eigene Forks): erlaubt, **aber** der Source-Code muss unter AGPL-3.0 verfügbar gemacht werden. Closed-Source-Einbau: nur via Dual-License-Vereinbarung.
 
-Wenn du Lokyy in ein closed-source Produkt einbauen willst, sprich uns für eine Dual-License-Vereinbarung an.
-
-Upstream-Komponenten (alle MIT/Apache-permissiv und AGPL-kompatibel): [Hermes Agent](https://github.com/nousresearch/hermes-agent) (MIT), [Hermes Workspace](https://github.com/outsourc-e/hermes-workspace) (MIT), Traefik (MIT), [Better-Auth](https://better-auth.com) (MIT). Vollständige Lizenz-Inventur unter [`docs/licensing-todo.md`](docs/licensing-todo.md). Attribution unter [`NOTICE`](NOTICE).
-
----
-
-## Mitmachen
-
-- **Bugs** → [GitHub Issues](https://github.com/oliverhees/lokyy/issues)
-- **Feature-Requests** → erst die [bestehenden Issues](https://github.com/oliverhees/lokyy/issues) durchsuchen, dann neuen anlegen
-- **Code-Beiträge** → PRs willkommen; bitte `docs/decisions/` lesen bevor du größere Architektur-Änderungen vorschlägst
+Attribution + Third-Party-Lizenzen: [`NOTICE`](NOTICE).
