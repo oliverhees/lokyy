@@ -47,7 +47,6 @@ import {
   UsersIcon,
   WalletMinimalIcon,
   type LucideIcon,
-  GithubIcon,
   RedoDotIcon,
   BrushCleaningIcon,
   CreditCardIcon,
@@ -210,11 +209,6 @@ export const navItems: NavGroup[] = [
   {
     title: "System",
     items: [
-      {
-        title: "n8n",
-        href: "/n8n",
-        icon: GithubIcon
-      },
       {
         title: "Settings",
         href: "/settings",

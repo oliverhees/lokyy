@@ -4,7 +4,7 @@
  * Phase-2c+: the backend returns a *flat* object (no { settings: … } wrapper)
  * with general/notifications/hermes blocks plus a hermesLive flag.
  *
- * Older fields (vaultPath, n8nUrl, ttsEnabled, …) are not yet wired in the
+ * Older fields (vaultPath, ttsEnabled, …) are not yet wired in the
  * backend — they remain typed as optional so the UI can degrade gracefully
  * until those slices land.
  */
@@ -26,7 +26,6 @@ export type LokyySettings = {
   // Local/dev-only fields (vite middleware in dev, not yet in lokyy-os-be).
   // Kept optional so the UI's legacy sections can opt in only when present.
   vaultPath?: string | null
-  n8nUrl?: string | null
   ttsEnabled?: boolean
   sttEnabled?: boolean
   autoOpenArtifacts?: boolean
