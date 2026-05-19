@@ -76,3 +76,20 @@ export async function dashGet<T = unknown>(path: string): Promise<T> {
   }
   return (await r.json()) as T;
 }
+
+/** Convenience: POST JSON body + parse JSON response. Throws on non-2xx. */
+export async function dashPost<T = unknown>(
+  path: string,
+  body: unknown
+): Promise<T> {
+  const r = await dashFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    throw new Error(`hermes-dashboard ${path} → HTTP ${r.status} ${text.slice(0, 200)}`);
+  }
+  return (await r.json()) as T;
+}

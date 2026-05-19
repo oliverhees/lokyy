@@ -9,6 +9,7 @@ import { conversations } from "./api/conversations.ts";
 import { activity } from "./api/activity.ts";
 import { dashboards } from "./api/dashboards.ts";
 import { workflows } from "./api/workflows.ts";
+import { tasks } from "./api/tasks.ts";
 
 const app = new Hono();
 
@@ -138,6 +139,10 @@ const workflowsApp = new Hono();
 workflowsApp.use("*", requireAuth);
 workflowsApp.route("/", workflows);
 app.route("/api/lokyy/workflows", workflowsApp);
+
+// Tasks (Kanban) — proxied to hermes-dashboard /api/plugins/kanban.
+// Mounted BEFORE the generic /api/lokyy stub-router so it wins for /tasks.
+app.route("/api/lokyy/tasks", tasks);
 
 // Phase-1d stub endpoints — sidebar routes call these on mount.
 // Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).
