@@ -84,14 +84,26 @@ function VaultPage() {
           </p>
         </div>
         <Card>
-          <CardContent className="p-6 text-center" data-testid="vault-empty">
+          <CardContent className="space-y-3 p-6 text-center" data-testid="vault-empty">
             <BrainIcon className="mx-auto size-12 text-muted-foreground/50" />
-            <p className="mt-3 text-sm font-medium">Kein Obsidian-Vault konfiguriert</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Setze die Env-Variable{' '}
-              <code className="rounded bg-muted px-1">LOKYY_VAULT_PATH=/pfad/zu/deinem/vault</code>{' '}
-              und starte den Dev-Server neu. Settings-UI für Vault-Pfad kommt in einer späteren Phase.
-            </p>
+            <p className="text-sm font-medium">Kein Obsidian-Vault konfiguriert</p>
+            <div className="space-y-2 text-left text-xs text-muted-foreground">
+              <p>
+                Lokyy läuft in Containern — der Vault-Pfad muss sowohl als Volume
+                ins <code className="rounded bg-muted px-1">lokyy-os-be</code>{' '}
+                gemountet sein als auch via Env-Variable bekannt gemacht werden.
+              </p>
+              <p>1. In <code className="rounded bg-muted px-1">infrastructure/docker-compose.yml</code> beim Service <code className="rounded bg-muted px-1">lokyy-os-be</code> einen volume-mount setzen, z.B.</p>
+              <pre className="rounded bg-muted/60 p-2 text-xs">{`volumes:
+  - lokyy-os-db:/app/data
+  - /pfad/zu/deinem/obsidian-vault:/vault:ro`}</pre>
+              <p>2. In <code className="rounded bg-muted px-1">infrastructure/.env.local</code> setzen:</p>
+              <pre className="rounded bg-muted/60 p-2 text-xs">LOKYY_VAULT_PATH=/vault</pre>
+              <p>
+                3. <code className="rounded bg-muted px-1">docker compose --env-file .env.local up -d lokyy-os-be</code> — und neu laden.
+                Settings-UI für den Vault-Pfad kommt in einer späteren Phase.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
