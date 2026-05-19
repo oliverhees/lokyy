@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { CalendarIcon, PauseIcon, PlayIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { CalendarIcon, PauseIcon, PlayIcon, PlusIcon, Trash2Icon, ZapIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -89,6 +89,32 @@ function JobsPage() {
     await refresh()
   }
 
+  const [runningId, setRunningId] = useState<string | null>(null)
+  async function onRunNow(id: string) {
+    setError(null)
+    setRunningId(id)
+    try {
+      const r = await fetch(`/api/lokyy/jobs/${encodeURIComponent(id)}/run`, { method: 'POST' })
+      const d = (await r.json()) as { ok?: boolean; error?: string; hermesSkipped?: boolean }
+      if (!d.ok) setError(d.error ?? 'Run failed')
+      else if (d.hermesSkipped) setError('Run ok — aber HERMES_API_KEY ist nicht gesetzt, Hermes-Call wurde übersprungen.')
+    } finally {
+      setRunningId(null)
+      await refresh()
+    }
+  }
+
+  function formatRelative(iso: string | undefined): string | null {
+    if (!iso) return null
+    const ms = Date.now() - new Date(iso).getTime()
+    if (!Number.isFinite(ms) || ms < 0) return null
+    const s = Math.floor(ms / 1000)
+    if (s < 60) return 'gerade eben'
+    if (s < 3600) return `vor ${Math.floor(s / 60)} min`
+    if (s < 86_400) return `vor ${Math.floor(s / 3600)} h`
+    return `vor ${Math.floor(s / 86_400)} d`
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -149,7 +175,22 @@ function JobsPage() {
                     <p className="truncate font-mono text-xs text-muted-foreground">
                       <code>{j.schedule}</code> · {j.command}
                     </p>
+                    {j.lastRun ? (
+                      <p className="text-xs text-muted-foreground" data-testid={`job-lastrun-${j.id}`}>
+                        zuletzt: {formatRelative(j.lastRun) ?? j.lastRun}
+                      </p>
+                    ) : null}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onRunNow(j.id)}
+                    disabled={runningId === j.id}
+                    title="Jetzt ausführen"
+                    data-testid={`job-runnow-${j.id}`}
+                  >
+                    <ZapIcon className="size-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
