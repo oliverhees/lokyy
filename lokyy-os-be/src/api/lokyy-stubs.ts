@@ -251,18 +251,86 @@ lokyyStubs.get("/hermes-webhooks", (c) =>
 
 // Matches InsightsData shape in lokyy-hermes.ts:
 //   { raw, summary: { sessions?, messages?, toolCalls?, totalTokens?, activeTime? } }
-lokyyStubs.get("/hermes-insights", (c) =>
-  c.json({
-    raw: HERMES_NOT_RUNNING_RAW,
+//
+// Insights are *derived* — hermes-dashboard does not expose a JSON
+// /api/insights endpoint (that path falls through to the SPA shell).
+// We aggregate /api/sessions instead. The ?days=N query (default 30)
+// is honored by filtering sessions whose started_at falls inside the
+// window. Tokens are summed across the 5 token-type buckets that
+// Hermes records per session.
+type HermesSession = {
+  id: string;
+  started_at?: number | null;
+  ended_at?: number | null;
+  last_active?: number | null;
+  is_active?: boolean | null;
+  message_count?: number | null;
+  tool_call_count?: number | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_tokens?: number | null;
+  cache_write_tokens?: number | null;
+  reasoning_tokens?: number | null;
+};
+
+function formatActiveTime(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return "0m";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  if (h >= 24) {
+    const d = Math.floor(h / 24);
+    const remH = h % 24;
+    return remH > 0 ? `${d}d ${remH}h` : `${d}d`;
+  }
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${m}m`;
+}
+
+lokyyStubs.get("/hermes-insights", async (c) => {
+  const days = Number.parseInt(c.req.query("days") ?? "30", 10);
+  const windowSeconds = Number.isFinite(days) && days > 0 ? days * 86_400 : 30 * 86_400;
+  const nowSec = Date.now() / 1000;
+  const cutoff = nowSec - windowSeconds;
+
+  const r = await safeDash<{ sessions?: HermesSession[] }>("/api/sessions", { sessions: [] });
+  if (!r.live) {
+    return c.json({
+      raw: r.error ?? HERMES_NOT_RUNNING_RAW,
+      summary: { sessions: 0, messages: 0, toolCalls: 0, totalTokens: 0, activeTime: "0m" },
+    });
+  }
+  const all = r.data.sessions ?? [];
+  const inWindow = all.filter((s) => (s.started_at ?? 0) >= cutoff);
+
+  let messages = 0;
+  let toolCalls = 0;
+  let totalTokens = 0;
+  let activeSeconds = 0;
+  for (const s of inWindow) {
+    messages += s.message_count ?? 0;
+    toolCalls += s.tool_call_count ?? 0;
+    totalTokens +=
+      (s.input_tokens ?? 0) +
+      (s.output_tokens ?? 0) +
+      (s.cache_read_tokens ?? 0) +
+      (s.cache_write_tokens ?? 0) +
+      (s.reasoning_tokens ?? 0);
+    const start = s.started_at ?? 0;
+    const end = s.ended_at ?? (s.is_active ? nowSec : s.last_active ?? start);
+    if (end > start) activeSeconds += end - start;
+  }
+
+  return c.json({
+    raw: `[lokyy] derived from ${inWindow.length} / ${all.length} sessions in the last ${days}d window`,
     summary: {
-      sessions: 0,
-      messages: 0,
-      toolCalls: 0,
-      totalTokens: 0,
-      activeTime: "0m",
+      sessions: inWindow.length,
+      messages,
+      toolCalls,
+      totalTokens,
+      activeTime: formatActiveTime(activeSeconds),
     },
-  })
-);
+  });
+});
 
 // Wired to hermes-dashboard /api/logs — returns recent gateway log lines.
 lokyyStubs.get("/hermes-logs", async (c) => {
