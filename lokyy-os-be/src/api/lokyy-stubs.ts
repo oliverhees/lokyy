@@ -118,9 +118,8 @@ lokyyStubs.get("/sessions", async (c) => {
 // Prompts / Teams / Workflows / Integrations
 // ─────────────────────────────────────────────────────────────────────────────
 
-lokyyStubs.get("/prompts", (c) =>
-  c.json({ prompts: [] })
-);
+// NOTE: /prompts moved to a dedicated router (src/api/prompts.ts)
+// with sqlite-backed CRUD — Issue #137.
 
 lokyyStubs.get("/teams", (c) =>
   c.json({ teams: [] })
