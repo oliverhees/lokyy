@@ -357,6 +357,9 @@ services:
       - LOKYY_SYSTEM_SECRET=${LOKYY_SYSTEM_SECRET}
       # Cron schedules in producer.json are interpreted in this timezone.
       - TZ=${LOKYY_CRON_TZ:-Europe/Berlin}
+      # Reminders MCP-tool (#158) proxies create-calls to lokyy-os-be's
+      # /api/lokyy/reminders/agent/create endpoint over lokyy-net.
+      - LOKYY_OS_BE_URL=http://lokyy-os-be
       # Chat-Wizard tools call Hermes /v1/chat/completions.
       - HERMES_BASE_URL=${HERMES_BASE_URL:-http://hermes:8642}
       - HERMES_API_KEY=${HERMES_API_KEY:-}

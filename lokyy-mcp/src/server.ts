@@ -21,6 +21,7 @@ import {
   type JSONRPCMessage,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { randomUUID } from "node:crypto";
 import { requireBearer, getPrincipal, type Principal } from "./auth.ts";
 import { admin } from "./admin.ts";
@@ -199,6 +200,44 @@ mcp.post("/messages", async (c) => {
 });
 
 app.route("/mcp", mcp);
+
+// ─── Streamable HTTP transport ────────────────────────────────────────────
+// Modern MCP clients (Hermes 2024-11+, Claude Desktop, etc.) speak the
+// "Streamable HTTP" transport which is a single endpoint that handles
+// both POST (client→server JSON-RPC) and GET (SSE replay). We host that
+// at /streaming/mcp alongside the legacy /mcp SSE one so older clients
+// keep working.
+//
+// One transport+server instance per active session — the SDK takes care
+// of session-ID generation, replay, and close.
+const streamingTransports = new Map<string, WebStandardStreamableHTTPServerTransport>();
+const streaming = new Hono();
+streaming.use("*", requireBearer);
+
+streaming.all("/mcp", async (c) => {
+  const principal = getPrincipal(c)!;
+  const sessionHeader = c.req.header("mcp-session-id") ?? "";
+
+  let transport = streamingTransports.get(sessionHeader);
+  if (!transport) {
+    transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (id) => {
+        streamingTransports.set(id, transport!);
+        console.log(`[lokyy-mcp] streaming session init — id=${id} principal=${principal.kind}`);
+      },
+      onsessionclosed: (id) => {
+        streamingTransports.delete(id);
+        console.log(`[lokyy-mcp] streaming session close — id=${id}`);
+      },
+    });
+    const server = buildMcpServer(principal);
+    await server.connect(transport);
+  }
+  return transport.handleRequest(c.req.raw);
+});
+
+app.route("/streaming", streaming);
 
 // Admin surface — Capability-Token management. System bearer only.
 app.route("/admin", admin);

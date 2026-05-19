@@ -16,6 +16,7 @@ import * as DraftChat from "./system-skills/DashboardBuilder/draft-chat.ts";
 import * as FromDraft from "./system-skills/DashboardBuilder/from-draft.ts";
 import * as Producer from "./system-skills/Producer/index.ts";
 import { tools as workflowTools } from "./system-skills/Workflow/index.ts";
+import * as Reminders from "./system-skills/Reminders/index.ts";
 
 export type ToolEntry = {
   tool: Tool;
@@ -67,6 +68,13 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
   [workflowTools.runNow.tool.name]: { tool: workflowTools.runNow.tool, minPrincipal: "system", handle: workflowTools.runNow.handle },
   [workflowTools.listRuns.tool.name]: { tool: workflowTools.listRuns.tool, minPrincipal: "system", handle: workflowTools.listRuns.handle },
   [workflowTools.getRun.tool.name]: { tool: workflowTools.getRun.tool, minPrincipal: "system", handle: workflowTools.getRun.handle },
+
+  // Reminders (Phase-Reminder Path-C, Issue #158) — system-only. The
+  // handler proxies to lokyy-os-be /api/lokyy/reminders/agent/create
+  // which is itself system-bearer-gated. This lets Hermes' MCP-client
+  // call create_reminder natively without going through the broken
+  // terminal/code_execution sandbox path.
+  [Reminders.tool.name]: { tool: Reminders.tool, minPrincipal: "system", handle: Reminders.handle },
 };
 
 export function principalAllowed(
