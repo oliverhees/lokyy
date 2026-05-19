@@ -52,9 +52,15 @@ services:
       - TASKS=1
       - INFO=1
       # POST=1 added in Phase-2b so lokyy-supervisor can call
-      # POST /containers/{name}/restart. Surface still bounded to the
-      # read-flags above; restart is a container action, no exec/build/etc.
+      # POST /containers/{name}/restart.
       - POST=1
+      # EXEC=1 added in audit-2026-05-19 cleanup so lokyy-os-be can call
+      # POST /containers/lokyy-hermes/exec for `hermes tools list` and
+      # `hermes webhook list`. Container-name scoping is enforced in
+      # hermes-cli-client.ts (HERMES_CONTAINER_NAME env), not at the proxy.
+      # TODO Phase-9: replace with a narrow lokyy-supervisor HTTP API
+      # so only a curated set of CLI invocations is reachable.
+      - EXEC=1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 

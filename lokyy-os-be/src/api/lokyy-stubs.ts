@@ -18,6 +18,7 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { auth } from "../auth.ts";
 import { dashGet } from "./hermes-dashboard-client.ts";
+import { runHermesCli } from "./hermes-cli-client.ts";
 
 /** Wrap a dashGet call: return the JSON on success, friendly empty + warning on failure. */
 async function safeDash<T>(path: string, emptyFallback: T): Promise<{ data: T; live: boolean; error?: string }> {
@@ -223,9 +224,48 @@ lokyyStubs.get("/hermes-channels", (c) =>
   c.json([])
 );
 
-lokyyStubs.get("/hermes-tools", (c) =>
-  c.json({ tools: [], raw: HERMES_NOT_RUNNING_RAW })
-);
+// Real backing — `hermes tools list` exec'd via docker-socket-proxy.
+// The CLI prints a section header followed by lines shaped like
+//   "  ✓ enabled  <name>  <emoji> <description>"
+//   "  ✗ disabled <name>  <emoji> <description>"
+// In TTY mode the output is wrapped in ANSI SGR escape codes that we
+// strip before applying the row regex.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI-strip is intentional
+const ANSI_RE = /\[[\d;]*m/g;
+const TOOLS_ROW = /^\s*(✓|✗)\s+(enabled|disabled)\s+(\S+)\s+(\S+)\s+(.+?)\s*$/u;
+lokyyStubs.get("/hermes-tools", async (c) => {
+  try {
+    const r = await runHermesCli(["tools", "list"]);
+    if (!r.ok) {
+      return c.json({
+        tools: [],
+        raw: `[lokyy] hermes tools list exit=${r.exitCode}\n${r.stdout.slice(0, 600)}`,
+      });
+    }
+    type Tool = { name: string; emoji: string; description: string; enabled: boolean };
+    const tools: Tool[] = [];
+    const cleaned = r.stdout.replace(ANSI_RE, "");
+    for (const line of cleaned.split(/\r?\n/)) {
+      const m = TOOLS_ROW.exec(line);
+      if (!m) continue;
+      tools.push({
+        enabled: m[2] === "enabled",
+        name: m[3]!,
+        emoji: m[4]!,
+        description: m[5]!,
+      });
+    }
+    return c.json({
+      tools,
+      raw: `[lokyy] ${tools.length} toolsets loaded from hermes tools list (${r.durationMs}ms)`,
+    });
+  } catch (err) {
+    return c.json({
+      tools: [],
+      raw: `[lokyy] tools-list exec failed: ${(err as Error).message}`,
+    });
+  }
+});
 
 // Wired to hermes-dashboard /api/skills — Lokyy maps skills → "plugins" in this panel
 lokyyStubs.get("/hermes-plugins", async (c) => {
@@ -245,9 +285,48 @@ lokyyStubs.get("/hermes-plugins", async (c) => {
   });
 });
 
-lokyyStubs.get("/hermes-webhooks", (c) =>
-  c.json({ enabled: false, webhooks: [], raw: HERMES_NOT_RUNNING_RAW })
-);
+// Real backing — `hermes webhook list` exec'd via docker-socket-proxy.
+// Two states matter to the FE:
+//   1. platform disabled → "Webhook platform is not enabled. To set it up:"
+//      We return enabled:false plus the setup instructions (so the UI can
+//      surface a real CTA instead of the old "not deployed" lie).
+//   2. platform enabled  → a list of subscriptions, one per line. Lines
+//      like "  <name>  <route>  -> <skill>" — we capture them verbatim
+//      and let the FE decide rendering, since we don't yet know the
+//      stable column format and don't want to lock it in prematurely.
+lokyyStubs.get("/hermes-webhooks", async (c) => {
+  try {
+    const r = await runHermesCli(["webhook", "list"]);
+    const notEnabled = /webhook platform is not enabled/i.test(r.stdout);
+    if (notEnabled) {
+      return c.json({
+        enabled: false,
+        webhooks: [],
+        raw: r.stdout.trim(),
+      });
+    }
+    if (!r.ok) {
+      return c.json({
+        enabled: false,
+        webhooks: [],
+        raw: `[lokyy] hermes webhook list exit=${r.exitCode}\n${r.stdout.slice(0, 600)}`,
+      });
+    }
+    // Platform is on — surface the raw listing for now. Parsing the table
+    // can land when we wire the create/edit flows in a follow-up issue.
+    return c.json({
+      enabled: true,
+      webhooks: [],
+      raw: r.stdout.trim(),
+    });
+  } catch (err) {
+    return c.json({
+      enabled: false,
+      webhooks: [],
+      raw: `[lokyy] webhook-list exec failed: ${(err as Error).message}`,
+    });
+  }
+});
 
 // Matches InsightsData shape in lokyy-hermes.ts:
 //   { raw, summary: { sessions?, messages?, toolCalls?, totalTokens?, activeTime? } }
