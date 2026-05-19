@@ -10,13 +10,62 @@
  *
  * Streaming responses (Server-Sent Events for chat completions) pass through
  * unchanged because we return the upstream Response body directly.
+ *
+ * Time-injection (#156): every POST /v1/chat/completions gets a small
+ * system-message prepended that tells the LLM the current wall-clock time
+ * and timezone. LLMs don't otherwise have any clue what time it is in the
+ * user's locale, and Hermes' default persona doesn't inject one, so the
+ * agent would otherwise hallucinate timestamps (Oliver saw "18:59" when
+ * it was actually 21:00). The injected message is small and prepended,
+ * so it doesn't disturb the rest of the conversation.
  */
 import { Hono } from "hono";
 
 const HERMES_BASE_URL = process.env.HERMES_BASE_URL ?? "http://hermes:8642";
 const HERMES_API_KEY = process.env.HERMES_API_KEY;
+const SCHEDULER_TZ = process.env.LOKYY_CRON_TZ ?? "Europe/Berlin";
 
 export const hermesStubs = new Hono();
+
+function buildLokyyGuardrails(): { role: "system"; content: string } {
+  const now = new Date();
+  const isoUtc = now.toISOString();
+  const local = new Intl.DateTimeFormat("de-DE", {
+    timeZone: SCHEDULER_TZ,
+    dateStyle: "full",
+    timeStyle: "long",
+  }).format(now);
+  return {
+    role: "system",
+    content:
+      `[Lokyy runtime context — inject pro Call, höchste Priorität]\n\n` +
+      `## Aktuelle Zeit\n` +
+      `Wand-Uhr (${SCHEDULER_TZ}): ${local}\n` +
+      `UTC/ISO-8601:               ${isoUtc}\n` +
+      `Nutze IMMER diese Zeit als Referenz für Reminders, Termine, "morgen", "in 10 Minuten" etc. Niemals raten.\n\n` +
+      `## EHRLICHKEITS-REGEL (überschreibt alles andere)\n` +
+      `1. WENN du KEIN funktionsfähiges Tool für die Aufgabe hast: sag das ehrlich. NIEMALS "Erledigt!", "Done", "✓ gesetzt", "läuft jetzt" wenn du gar nichts angerufen hast.\n` +
+      `2. WENN ein Tool-Call mit Error returnt: zitiere den Error wörtlich oder paraphrasiere knapp. NIEMALS einen erfundenen technischen Grund ("Docker-Problem", "API down", "Cron-Scheduler übernimmt") liefern den du nicht selbst gesehen hast.\n` +
+      `3. WENN du unsicher bist ob ein Tool-Call erfolgreich war: sag "Tool hat geantwortet aber ich bin mir nicht sicher ob es geklappt hat — prüf bitte unter /<route>".\n` +
+      `4. Reminders konkret: das lokyy-reminders Skill braucht curl via terminal-tool. Wenn dein terminal-tool nicht antwortet (Docker-Sandbox-Fail), sag dem User ehrlich "ich kann den Reminder gerade nicht selbst setzen — leg ihn bitte unter /reminders manuell an" und nichts anderes.\n` +
+      `Diese Regeln sind nicht verhandelbar. Wenn du dich gleich beim Antworten erwischst wie du "Erledigt!" tippen willst ohne ein Tool ausgeführt zu haben: STOPP, schreib die ehrliche Variante.`,
+  };
+}
+
+// Rewrites a POST /v1/chat/completions body: prepends the time-message
+// to the existing messages array. Returns the new body as a Uint8Array
+// ready to forward upstream.
+async function rewriteChatBody(originalBody: ArrayBuffer): Promise<Uint8Array | null> {
+  try {
+    const text = new TextDecoder().decode(originalBody);
+    const obj = JSON.parse(text) as { messages?: Array<unknown> };
+    if (!Array.isArray(obj.messages)) return null;
+    obj.messages = [buildLokyyGuardrails(), ...obj.messages];
+    return new TextEncoder().encode(JSON.stringify(obj));
+  } catch {
+    return null;
+  }
+}
 
 hermesStubs.all("/*", async (c) => {
   if (!HERMES_API_KEY) {
@@ -46,7 +95,20 @@ hermesStubs.all("/*", async (c) => {
 
   let body: BodyInit | undefined = undefined;
   if (c.req.method !== "GET" && c.req.method !== "HEAD") {
-    body = await c.req.raw.arrayBuffer();
+    const raw = await c.req.raw.arrayBuffer();
+    // Time-injection only for the chat-completions endpoint and only when
+    // the body parses as JSON with a messages array. For everything else
+    // we pass through unchanged.
+    if (
+      c.req.method === "POST" &&
+      apiPath === "/v1/chat/completions" &&
+      (ct ?? "").includes("application/json")
+    ) {
+      const rewritten = await rewriteChatBody(raw);
+      body = rewritten ?? raw;
+    } else {
+      body = raw;
+    }
   }
 
   let upstream: Response;
