@@ -53,7 +53,7 @@ export function AIChatInterface({ agent }: { agent: Agent }) {
 
   useEffect(() => {
     readSettings()
-      .then((s) => setTtsEnabled(s.ttsEnabled))
+      .then((s) => setTtsEnabled(s.ttsEnabled ?? false))
       .catch(() => {})
   }, [])
 
