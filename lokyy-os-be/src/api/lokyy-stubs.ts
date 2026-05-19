@@ -262,9 +262,41 @@ lokyyStubs.get("/hermes-memory", async (c) => {
   }
 });
 
-lokyyStubs.get("/hermes-channels", (c) =>
-  c.json([])
-);
+// Channels = the messaging-platforms Hermes can be a bot in. The
+// authoritative list is the Platform enum in /opt/hermes/gateway/config.py
+// (22 members). We curate the 14 user-facing messaging platforms here;
+// internal members (LOCAL, API_SERVER) are intentionally omitted.
+//
+// "configured" is read live from /api/config → platforms.<id>.enabled
+// (Hermes only writes that subtree after `hermes gateway setup` ran).
+type ChannelPlatform = { id: string; name: string; description: string; configured: boolean };
+const SUPPORTED_PLATFORMS: Omit<ChannelPlatform, "configured">[] = [
+  { id: "telegram", name: "Telegram", description: "Bot via Telegram Bot API" },
+  { id: "discord", name: "Discord", description: "Bot in Discord servers (slash + DMs)" },
+  { id: "whatsapp", name: "WhatsApp", description: "Business cloud API or local bridge" },
+  { id: "slack", name: "Slack", description: "Slack-bot in workspace channels" },
+  { id: "signal", name: "Signal", description: "Signal via signal-cli bridge" },
+  { id: "matrix", name: "Matrix", description: "Matrix homeserver bot" },
+  { id: "mattermost", name: "Mattermost", description: "Mattermost team chat bot" },
+  { id: "email", name: "Email", description: "IMAP/SMTP — agent answers inbox threads" },
+  { id: "sms", name: "SMS", description: "Twilio / similar SMS gateway" },
+  { id: "webhook", name: "Webhook", description: "Generic HTTP event ingress" },
+  { id: "weixin", name: "Weixin (WeChat)", description: "WeChat official account" },
+  { id: "feishu", name: "Feishu / Lark", description: "Feishu mini-program + chatbot" },
+  { id: "dingtalk", name: "DingTalk", description: "DingTalk enterprise IM bot" },
+  { id: "homeassistant", name: "Home Assistant", description: "Smart-home conversation agent" },
+];
+
+type ConfigShape = { platforms?: Record<string, { enabled?: boolean }> };
+lokyyStubs.get("/hermes-channels", async (c) => {
+  const r = await safeDash<ConfigShape>("/api/config", {});
+  const platforms = r.data.platforms ?? {};
+  const out: ChannelPlatform[] = SUPPORTED_PLATFORMS.map((p) => ({
+    ...p,
+    configured: platforms[p.id]?.enabled === true,
+  }));
+  return c.json(out);
+});
 
 // Real backing — `hermes tools list` exec'd via docker-socket-proxy.
 // The CLI prints a section header followed by lines shaped like
