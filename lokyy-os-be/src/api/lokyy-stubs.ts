@@ -209,16 +209,58 @@ lokyyStubs.get("/vault", (c) => {
 const HERMES_NOT_RUNNING_RAW =
   "[lokyy] Hermes Agent is not deployed yet. This panel goes live in Phase-2 of the Lokyy roadmap.";
 
-// Matches MemoryStatus shape in lokyy-hermes.ts:
-//   { builtinActive, activeProvider, installedProviders[], raw }
-lokyyStubs.get("/hermes-memory", (c) =>
-  c.json({
-    builtinActive: true,
-    activeProvider: null,
-    installedProviders: [],
-    raw: HERMES_NOT_RUNNING_RAW,
-  })
-);
+// Real backing — `hermes memory status` exec'd via docker-socket-proxy.
+// CLI prints "Provider:  <name>" or "Provider: (none — built-in only)"
+// followed by a bullet list of installed providers, each tagged with a
+// mode string in parentheses, e.g. "(requires API key)", "(local)".
+const PROVIDER_ROW = /^\s*[•\-*]\s+(\S+)\s+\(([^)]+)\)/;
+const ACTIVE_PROVIDER_RE = /^\s*Provider:\s*(.+?)\s*$/;
+lokyyStubs.get("/hermes-memory", async (c) => {
+  try {
+    const r = await runHermesCli(["memory", "status"]);
+    if (!r.ok) {
+      return c.json({
+        builtinActive: true,
+        activeProvider: null,
+        installedProviders: [],
+        raw: `[lokyy] hermes memory status exit=${r.exitCode}\n${r.stdout.slice(0, 600)}`,
+      });
+    }
+    const cleaned = r.stdout.replace(ANSI_RE, "");
+    let activeProvider: string | null = null;
+    type Provider = { name: string; requiresKey: boolean; mode: string };
+    const providers: Provider[] = [];
+    for (const line of cleaned.split(/\r?\n/)) {
+      const p = ACTIVE_PROVIDER_RE.exec(line);
+      if (p) {
+        const v = p[1]!.trim();
+        activeProvider = /^\(none/.test(v) ? null : v;
+        continue;
+      }
+      const m = PROVIDER_ROW.exec(line);
+      if (!m) continue;
+      const mode = m[2]!.trim();
+      providers.push({
+        name: m[1]!,
+        requiresKey: /requires api key/i.test(mode),
+        mode,
+      });
+    }
+    return c.json({
+      builtinActive: true,
+      activeProvider,
+      installedProviders: providers,
+      raw: `[lokyy] ${providers.length} memory providers parsed (${r.durationMs}ms)`,
+    });
+  } catch (err) {
+    return c.json({
+      builtinActive: true,
+      activeProvider: null,
+      installedProviders: [],
+      raw: `[lokyy] memory-status exec failed: ${(err as Error).message}`,
+    });
+  }
+});
 
 lokyyStubs.get("/hermes-channels", (c) =>
   c.json([])
