@@ -5,7 +5,6 @@ const STORE_PATH = path.resolve(process.cwd(), 'data', 'settings.json')
 
 export type LokyySettings = {
   vaultPath: string | null
-  n8nUrl: string | null
   ttsEnabled: boolean
   sttEnabled: boolean
   autoOpenArtifacts: boolean
@@ -15,7 +14,6 @@ export type LokyySettings = {
 
 const DEFAULTS: LokyySettings = {
   vaultPath: null,
-  n8nUrl: null,
   ttsEnabled: false,
   sttEnabled: false,
   autoOpenArtifacts: true,

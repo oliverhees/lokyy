@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { SaveIcon, BrainIcon, ZapIcon, MicIcon, Volume2Icon, StethoscopeIcon, DownloadIcon, SparklesIcon, SettingsIcon, BellIcon, ServerIcon, CircleIcon } from 'lucide-react'
+import { SaveIcon, BrainIcon, MicIcon, Volume2Icon, StethoscopeIcon, DownloadIcon, SparklesIcon, SettingsIcon, BellIcon, ServerIcon, CircleIcon } from 'lucide-react'
 import { fetchDoctor, fetchBackup, fetchCurator } from '@/lib/lokyy-hermes'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -61,7 +61,6 @@ function SettingsPage() {
   }
 
   const hasLegacyVault = settings.vaultPath !== undefined
-  const hasLegacyN8n = settings.n8nUrl !== undefined
   const hasLegacyVoice = settings.ttsEnabled !== undefined || settings.sttEnabled !== undefined
 
   return (
@@ -100,28 +99,6 @@ function SettingsPage() {
               placeholder="/home/oliver/Documents/MyVault"
               onSave={(v) => save({ vaultPath: v || null })}
               testid="settings-vault-path"
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {hasLegacyN8n ? (
-        <Card data-testid="settings-n8n">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <ZapIcon className="size-5 text-muted-foreground" />
-              <CardTitle className="text-base">n8n — Embed-URL</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              URL deiner n8n-Instanz. Wird auf <code className="rounded bg-muted px-1">/n8n</code> als iframe eingebettet.
-            </p>
-            <PathInput
-              initial={settings.n8nUrl ?? ''}
-              placeholder="http://localhost:5678"
-              onSave={(v) => save({ n8nUrl: v || null })}
-              testid="settings-n8n-url"
             />
           </CardContent>
         </Card>
