@@ -6,6 +6,7 @@ import { auth } from "./auth.ts";
 import { lokyyStubs } from "./api/lokyy-stubs.ts";
 import { jobs } from "./api/jobs.ts";
 import { prompts } from "./api/prompts.ts";
+import { teams } from "./api/teams.ts";
 import { hermesStubs } from "./api/hermes-stubs.ts";
 import { conversations } from "./api/conversations.ts";
 import { activity } from "./api/activity.ts";
@@ -152,6 +153,9 @@ app.route("/api/lokyy/jobs", jobs);
 
 // Prompts — sqlite-backed CRUD (Issue #137). Same precedence story.
 app.route("/api/lokyy/prompts", prompts);
+
+// Teams — sqlite-backed CRUD (Issue #139). Same precedence story.
+app.route("/api/lokyy/teams", teams);
 
 // Phase-1d stub endpoints — sidebar routes call these on mount.
 // Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).
