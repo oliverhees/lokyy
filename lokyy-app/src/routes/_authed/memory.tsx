@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { BrainIcon, CheckCircle2Icon, KeyIcon, HardDriveIcon } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { BrainIcon, CheckCircle2Icon, KeyIcon, HardDriveIcon, SparklesIcon, UserIcon, SaveIcon, Loader2Icon } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { fetchMemory, type MemoryStatus } from '@/lib/lokyy-hermes'
+import { fetchPersona, savePersona, fetchUserFacts, saveUserFacts, type EditableFile } from '@/lib/lokyy-persona'
 
 export const Route = createFileRoute('/_authed/memory')({ component: MemoryPage })
 
@@ -17,12 +20,30 @@ function MemoryPage() {
       <div className="space-y-1">
         <h1 className="text-xl font-bold tracking-tight lg:text-2xl">Memory</h1>
         <p className="text-sm text-muted-foreground">
-          Hermes-Memory: Built-in (MEMORY.md/USER.md) ist immer aktiv. Externe Provider können dazugeschaltet werden.
+          Was Lokyys Agent über dich weiß und wie er sich verhält. Änderungen wirken sofort beim nächsten Chat — kein Neustart nötig.
         </p>
       </div>
 
+      <EditableFileCard
+        title="Agent-Persona (SOUL.md)"
+        description="Wer Lokyy ist, wie er kommuniziert, was er kann/nicht-kann. Wird bei jeder Message frisch geladen."
+        icon={<SparklesIcon className="size-5 text-muted-foreground" />}
+        fetcher={fetchPersona}
+        saver={savePersona}
+        testid="memory-persona"
+      />
+
+      <EditableFileCard
+        title="Über dich (USER.md)"
+        description="Stabile Fakten: Name, Anrede, Sprache, bevorzugter Notification-Channel. Lokyy liest das automatisch."
+        icon={<UserIcon className="size-5 text-muted-foreground" />}
+        fetcher={fetchUserFacts}
+        saver={saveUserFacts}
+        testid="memory-user-facts"
+      />
+
       {error ? <Card><CardContent className="p-6"><p className="text-sm text-destructive">{error}</p></CardContent></Card> :
-       !status ? <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">lade…</p></CardContent></Card> :
+       !status ? <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">lade Provider-Status…</p></CardContent></Card> :
       (<>
         <Card data-testid="memory-status">
           <CardHeader>
@@ -65,5 +86,94 @@ function MemoryPage() {
         </Card>
       </>)}
     </div>
+  )
+}
+
+function EditableFileCard({
+  title,
+  description,
+  icon,
+  fetcher,
+  saver,
+  testid,
+}: {
+  title: string
+  description: string
+  icon: React.ReactNode
+  fetcher: () => Promise<EditableFile>
+  saver: (content: string) => Promise<void>
+  testid: string
+}) {
+  const [file, setFile] = useState<EditableFile | null>(null)
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetcher()
+      .then((f) => {
+        setFile(f)
+        setDraft(f.content)
+      })
+      .catch((e) => setError(String(e)))
+  }, [fetcher])
+
+  async function onSave() {
+    setBusy(true)
+    setError(null)
+    try {
+      await saver(draft)
+      setSavedAt(Date.now())
+      setFile((prev) => (prev ? { ...prev, content: draft } : prev))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const dirty = file !== null && draft !== file.content
+  const justSaved = savedAt !== null && Date.now() - savedAt < 3000
+
+  return (
+    <Card data-testid={testid}>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          {icon}
+          <div className="flex-1">
+            <CardTitle className="text-base">{title}</CardTitle>
+            <CardDescription className="text-xs">{description}</CardDescription>
+          </div>
+          {file?.path ? <code className="text-xs text-muted-foreground">{file.path}</code> : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {file === null ? (
+          <p className="text-sm text-muted-foreground">lade…</p>
+        ) : (
+          <>
+            <Textarea
+              rows={Math.min(20, Math.max(8, draft.split('\n').length + 1))}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              spellCheck={false}
+              className="font-mono text-xs"
+              data-testid={`${testid}-textarea`}
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {dirty ? 'Ungespeicherte Änderungen' : justSaved ? 'Gespeichert ✓' : 'Live im nächsten Chat.'}
+              </p>
+              <Button onClick={onSave} disabled={busy || !dirty} size="sm" data-testid={`${testid}-save`}>
+                {busy ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <SaveIcon className="mr-1 size-3" />}
+                Speichern
+              </Button>
+            </div>
+            {error ? <p className="text-xs text-destructive" role="alert">{error}</p> : null}
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }

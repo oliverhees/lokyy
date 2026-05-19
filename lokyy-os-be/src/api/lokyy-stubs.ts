@@ -18,7 +18,11 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { auth } from "../auth.ts";
 import { dashGet } from "./hermes-dashboard-client.ts";
-import { runHermesCli } from "./hermes-cli-client.ts";
+import {
+  runHermesCli,
+  readHermesDataFile,
+  writeHermesDataFile,
+} from "./hermes-cli-client.ts";
 
 /** Wrap a dashGet call: return the JSON on success, friendly empty + warning on failure. */
 async function safeDash<T>(path: string, emptyFallback: T): Promise<{ data: T; live: boolean; error?: string }> {
@@ -781,3 +785,77 @@ lokyyStubs.get("/hermes-backup", (c) =>
     path: null,
   })
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hermes Persona (SOUL.md) + User-Facts (USER.md) — Issue #152
+//
+// Hermes loads /opt/data/SOUL.md fresh on every message. /opt/data/USER.md
+// holds stable facts about the user (name, channel-preference, timezone)
+// that the agent reads alongside the persona. Both are markdown — we
+// expose them as plain {content, path} pairs the FE can show in a
+// textarea + save back.
+//
+// Read uses 'cat' via docker-exec (already proven path for /tools); write
+// uses base64-decode via 'sh -c' so we don't have to wrestle docker's
+// stdin-attach hijack flow over fetch.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const HERMES_FILE_MAX_BYTES = 64 * 1024; // 64 KiB cap on writes
+
+async function readEditableFile(c: import("hono").Context, relPath: string) {
+  try {
+    const r = await readHermesDataFile(relPath);
+    // 'cat' on a missing file returns exit-code 1 with empty stdout —
+    // we surface that as ok:true + empty content so the FE can show
+    // an "uninitialized" state without an error toast.
+    if (!r.ok) {
+      return c.json({
+        ok: true,
+        path: `/opt/data/${relPath}`,
+        content: "",
+        exists: false,
+        durationMs: r.durationMs,
+      });
+    }
+    return c.json({
+      ok: true,
+      path: `/opt/data/${relPath}`,
+      content: r.stdout.replace(/\r\n/g, "\n"),
+      exists: true,
+      durationMs: r.durationMs,
+    });
+  } catch (err) {
+    return c.json({ ok: false, error: (err as Error).message }, 500);
+  }
+}
+
+async function writeEditableFile(c: import("hono").Context, relPath: string) {
+  const body = (await c.req.json().catch(() => ({}))) as { content?: unknown };
+  if (typeof body.content !== "string") {
+    return c.json({ ok: false, error: "content (string) required" }, 400);
+  }
+  if (body.content.length > HERMES_FILE_MAX_BYTES) {
+    return c.json(
+      { ok: false, error: `content exceeds ${HERMES_FILE_MAX_BYTES} bytes` },
+      413,
+    );
+  }
+  try {
+    const r = await writeHermesDataFile(relPath, body.content);
+    if (!r.ok) {
+      return c.json(
+        { ok: false, error: `write failed: exit=${r.exitCode}` },
+        500,
+      );
+    }
+    return c.json({ ok: true, path: `/opt/data/${relPath}`, durationMs: r.durationMs });
+  } catch (err) {
+    return c.json({ ok: false, error: (err as Error).message }, 500);
+  }
+}
+
+lokyyStubs.get("/hermes-persona", (c) => readEditableFile(c, "SOUL.md"));
+lokyyStubs.put("/hermes-persona", (c) => writeEditableFile(c, "SOUL.md"));
+
+lokyyStubs.get("/hermes-user-facts", (c) => readEditableFile(c, "USER.md"));
+lokyyStubs.put("/hermes-user-facts", (c) => writeEditableFile(c, "USER.md"));
