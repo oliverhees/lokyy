@@ -15,7 +15,13 @@ Source: https://github.com/outsourc-e/hermes-workspace
 
 Lokyy — portions written by the Lokyy authors.
 
-[Licensing decision pending — see docs/questions.md]
+Copyright (c) 2026 Oliver Hees and Lokyy contributors.
+
+Licensed under the GNU Affero General Public License, version 3 or later
+(AGPL-3.0-or-later). See LICENSE for the full text. The AGPL Section 13
+network-use clause applies: anyone modifying Lokyy and offering it as a
+network service must make their modified source available to users of that
+service, under the same license.
 
 ---
 

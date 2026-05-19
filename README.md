@@ -2,7 +2,7 @@
 
 > **Dein eigenes KI-Betriebssystem auf deinem eigenen Server.** Tasks, Agents, Workflows, Tools, Memory — alles unter deiner Kontrolle, alle Daten bei dir.
 
-![status](https://img.shields.io/badge/status-personal--beta-blueviolet) ![license](https://img.shields.io/badge/license-TBD-lightgrey)
+![status](https://img.shields.io/badge/status-personal--beta-blueviolet) ![license](https://img.shields.io/badge/license-AGPL--3.0-blue)
 
 Lokyy ist ein selbst-gehostetes KI-Betriebssystem, gebaut auf [Hermes Agent](https://github.com/nousresearch/hermes-agent). Du bekommst:
 
@@ -268,9 +268,17 @@ Volle Architektur-Doku unter `docs/decisions/ADR-003-docker-topology-etappe-2.md
 
 ## Lizenz
 
-**Lokyy: Lizenz-Entscheidung steht noch aus** (siehe [`docs/questions.md`](docs/questions.md) und [`docs/licensing-todo.md`](docs/licensing-todo.md)). Bis eine Lizenz festgelegt ist gilt: Self-Install zur persönlichen Nutzung ist erlaubt, Weiterverteilung oder kommerzielle Nutzung bitte erst nach Absprache.
+**Lokyy — [GNU AGPL-3.0-or-later](LICENSE)** (Affero General Public License v3 oder neuer).
 
-Upstream-Komponenten: [Hermes Agent](https://github.com/nousresearch/hermes-agent) (MIT), [Hermes Workspace](https://github.com/outsourc-e/hermes-workspace) (MIT), Traefik (MIT), [Better-Auth](https://better-auth.com) (MIT). Vollständige Lizenz-Inventur unter [`docs/licensing-todo.md`](docs/licensing-todo.md). Attribution unter [`NOTICE`](NOTICE).
+Was das für dich bedeutet:
+- ✅ **Persönlich self-hosten** — erlaubt, ohne Auflagen.
+- ✅ **Lokal modifizieren** — erlaubt, ohne Auflagen.
+- ⚠ **Als SaaS / Online-Service anbieten** (auch eigene Forks) — erlaubt, ABER du musst deinen Source-Code unter AGPL-3.0 verfügbar machen. Das ist die "Affero"-Klausel: SaaS-Hoster müssen Source teilen, anders als bei klassischem GPL.
+- ⚠ **Kommerziell weiterverteilen / einbauen** — erlaubt, aber abgeleitete Werke müssen ebenfalls AGPL-3.0 sein.
+
+Wenn du Lokyy in ein closed-source Produkt einbauen willst, sprich uns für eine Dual-License-Vereinbarung an.
+
+Upstream-Komponenten (alle MIT/Apache-permissiv und AGPL-kompatibel): [Hermes Agent](https://github.com/nousresearch/hermes-agent) (MIT), [Hermes Workspace](https://github.com/outsourc-e/hermes-workspace) (MIT), Traefik (MIT), [Better-Auth](https://better-auth.com) (MIT). Vollständige Lizenz-Inventur unter [`docs/licensing-todo.md`](docs/licensing-todo.md). Attribution unter [`NOTICE`](NOTICE).
 
 ---
 
