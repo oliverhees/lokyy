@@ -7,6 +7,7 @@ import { lokyyStubs } from "./api/lokyy-stubs.ts";
 import { jobs } from "./api/jobs.ts";
 import { prompts } from "./api/prompts.ts";
 import { teams } from "./api/teams.ts";
+import { startScheduler } from "./scheduler/job-runner.ts";
 import { hermesStubs } from "./api/hermes-stubs.ts";
 import { conversations } from "./api/conversations.ts";
 import { activity } from "./api/activity.ts";
@@ -168,6 +169,10 @@ app.notFound((c) =>
 
 const port = Number(process.env.PORT ?? 80);
 console.log(`lokyy-os-be (Phase-1b) listening on :${port}`);
+
+// Start the in-process cron-scheduler for /jobs (Issue #141). Tick interval
+// is 60s by default; override via SCHEDULER_TICK_MS for tests.
+startScheduler();
 
 export default {
   port,
