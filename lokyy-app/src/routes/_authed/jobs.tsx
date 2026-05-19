@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { CalendarIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { CalendarIcon, PauseIcon, PlayIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -76,6 +76,19 @@ function JobsPage() {
     await refresh()
   }
 
+  async function onToggleStatus(id: string, current: 'active' | 'paused' | 'unknown') {
+    const next = current === 'active' ? 'paused' : 'active'
+    setError(null)
+    const r = await fetch(`/api/lokyy/jobs/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    })
+    const d = (await r.json()) as { ok?: boolean; error?: string }
+    if (!d.ok) setError(d.error ?? 'Toggle failed')
+    await refresh()
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -137,6 +150,15 @@ function JobsPage() {
                       <code>{j.schedule}</code> · {j.command}
                     </p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onToggleStatus(j.id, j.status)}
+                    title={j.status === 'active' ? 'Pause' : 'Resume'}
+                    data-testid={`job-toggle-${j.id}`}
+                  >
+                    {j.status === 'active' ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => onDelete(j.id)} data-testid={`job-delete-${j.id}`}>
                     <Trash2Icon className="size-4" />
                   </Button>
