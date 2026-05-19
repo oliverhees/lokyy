@@ -158,6 +158,12 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - lokyy-os-db:/app/data
+      # Second-Brain: mount your Obsidian vault read-only and set
+      # LOKYY_VAULT_PATH below to the container-side path. The /vault
+      # route in lokyy-app reads files via fs.readdir/readFile inside
+      # this container; without the mount the route shows the
+      # "Kein Obsidian-Vault konfiguriert" empty-state.
+      # - ${LOKYY_VAULT_HOST_PATH:-/dev/null}:/vault:ro
     environment:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - AUTH_BASE_URL=https://${DOMAIN}
@@ -171,6 +177,10 @@ services:
       # proxies dashboard mutations to lokyy-mcp on behalf of the user.
       - LOKYY_SYSTEM_SECRET=${LOKYY_SYSTEM_SECRET}
       - LOKYY_MCP_URL=${LOKYY_MCP_URL:-http://lokyy-mcp:7878}
+      # Second-Brain root. Empty → /vault route shows the "not
+      # configured" card. Set to a container-side path that the
+      # commented-out volume-mount above exposes (e.g. /vault).
+      - LOKYY_VAULT_PATH=${LOKYY_VAULT_PATH:-}
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
       interval: 10s

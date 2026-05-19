@@ -274,27 +274,167 @@ lokyyStubs.post("/settings", async (c) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Vault — Phase-3 will route through lokyy-brain. Phase-1d returns empty.
+// Vault — read-only filesystem listing rooted at LOKYY_VAULT_PATH.
+// (Phase-3 will route writes through lokyy-brain; today is reads only.)
+//
+// Security: every request resolves `path` strictly relative to the
+// vault root, then asserts that the resolved absolute path is still
+// underneath the root via fs.realpath() comparison. This blocks both
+// `..` traversal and symlink-escape. Files > VAULT_READ_MAX_BYTES
+// return truncated content with a header so the FE can show a clear
+// "file truncated" hint.
 // ─────────────────────────────────────────────────────────────────────────────
+import { readdir, readFile, realpath, stat } from "node:fs/promises";
+import { join, normalize, sep } from "node:path";
 
-// Vault — matches VaultListResponse / VaultReadResponse shapes from lokyy-vault.ts
-lokyyStubs.get("/vault", (c) => {
-  const action = c.req.query("action");
-  const path = c.req.query("path") ?? "";
-  if (action === "read") {
-    return c.json({
-      configured: false,
-      root: null,
-      content: "",
-      path,
-    });
+const VAULT_ROOT_RAW = process.env.LOKYY_VAULT_PATH ?? "";
+const VAULT_READ_MAX_BYTES = 256 * 1024; // 256 KiB cap on file reads
+
+async function resolveVaultRoot(): Promise<string | null> {
+  if (!VAULT_ROOT_RAW) return null;
+  try {
+    return await realpath(VAULT_ROOT_RAW);
+  } catch {
+    return null;
   }
-  return c.json({
-    configured: false,
-    root: null,
-    entries: [],
-    path,
-  });
+}
+
+async function safeResolve(
+  root: string,
+  rel: string,
+): Promise<{ ok: true; absolute: string } | { ok: false; error: string }> {
+  // Normalize, drop leading slashes, then resolve relative to root.
+  // Any `..` that escapes the root is rejected by the realpath-prefix check.
+  const cleaned = normalize(rel || ".").replace(/^[/\\]+/, "");
+  const joined = join(root, cleaned);
+  let absolute: string;
+  try {
+    absolute = await realpath(joined);
+  } catch {
+    return { ok: false, error: "path not found" };
+  }
+  if (absolute !== root && !absolute.startsWith(root + sep)) {
+    return { ok: false, error: "path escapes vault root" };
+  }
+  return { ok: true, absolute };
+}
+
+type VaultEntry = {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  size?: number;
+  modified?: string;
+};
+
+lokyyStubs.get("/vault", async (c) => {
+  const action = c.req.query("action");
+  const reqPath = c.req.query("path") ?? "";
+
+  const root = await resolveVaultRoot();
+  if (!root) {
+    // Same payload shape as before — FE already renders a clean "not
+    // configured" card when configured:false comes back.
+    return c.json(
+      action === "read"
+        ? { configured: false, root: null, content: "", path: reqPath }
+        : { configured: false, root: null, entries: [], path: reqPath },
+    );
+  }
+
+  const resolved = await safeResolve(root, reqPath);
+  if (!resolved.ok) {
+    return c.json(
+      action === "read"
+        ? { configured: true, root, content: "", path: reqPath, error: resolved.error }
+        : { configured: true, root, entries: [], path: reqPath, error: resolved.error },
+      400,
+    );
+  }
+
+  if (action === "read") {
+    try {
+      const st = await stat(resolved.absolute);
+      if (!st.isFile()) {
+        return c.json(
+          { configured: true, root, content: "", path: reqPath, error: "not a file" },
+          400,
+        );
+      }
+      // Read at most VAULT_READ_MAX_BYTES — Bun's readFile accepts the
+      // standard fs options; we then truncate in-memory if oversized.
+      const buf = await readFile(resolved.absolute);
+      let content = buf.toString("utf8");
+      let truncated = false;
+      if (buf.byteLength > VAULT_READ_MAX_BYTES) {
+        content = buf.subarray(0, VAULT_READ_MAX_BYTES).toString("utf8");
+        truncated = true;
+      }
+      return c.json({
+        configured: true,
+        root,
+        content,
+        path: reqPath,
+        truncated,
+        size: st.size,
+      });
+    } catch (err) {
+      return c.json(
+        {
+          configured: true,
+          root,
+          content: "",
+          path: reqPath,
+          error: (err as Error).message,
+        },
+        500,
+      );
+    }
+  }
+
+  // Directory listing. Hide dotfiles by default (Obsidian config etc.).
+  try {
+    const dirents = await readdir(resolved.absolute, { withFileTypes: true });
+    const entries: VaultEntry[] = [];
+    for (const d of dirents) {
+      if (d.name.startsWith(".")) continue;
+      const childAbs = join(resolved.absolute, d.name);
+      const childRel = join(reqPath || "", d.name);
+      let size: number | undefined;
+      let modified: string | undefined;
+      try {
+        const st = await stat(childAbs);
+        size = d.isFile() ? st.size : undefined;
+        modified = st.mtime.toISOString();
+      } catch {
+        // best-effort metadata; skip silently
+      }
+      entries.push({
+        name: d.name,
+        path: childRel,
+        type: d.isDirectory() ? "dir" : "file",
+        size,
+        modified,
+      });
+    }
+    // Dirs first, then files; alpha within each group.
+    entries.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    return c.json({ configured: true, root, entries, path: reqPath });
+  } catch (err) {
+    return c.json(
+      {
+        configured: true,
+        root,
+        entries: [],
+        path: reqPath,
+        error: (err as Error).message,
+      },
+      500,
+    );
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
