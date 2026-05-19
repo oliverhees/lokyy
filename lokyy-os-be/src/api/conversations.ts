@@ -97,10 +97,15 @@ conversations.post("/", async (c) => {
 conversations.get("/:id", (c) => {
   const conv = readStore().conversations.find((x) => x.id === c.req.param("id"));
   if (!conv) return c.json({ error: "not_found" }, 404);
-  return c.json(conv);
+  // Wrap to match POST/PUT/append shape — returning the bare object
+  // left history-clicks silently broken (Issue #150).
+  return c.json({ conversation: conv });
 });
 
-conversations.put("/:id", async (c) => {
+// PUT (idempotent) + PATCH (partial) hit the same handler. FE
+// updateConversation() sends PATCH; older direct-API callers may use
+// PUT. Both write the same partial-merge into the store.
+async function patchHandler(c: import("hono").Context) {
   const patch = (await c.req.json().catch(() => ({}))) as Partial<
     Pick<Conversation, "title" | "messages" | "model" | "agentId">
   >;
@@ -115,7 +120,9 @@ conversations.put("/:id", async (c) => {
   store.conversations[idx] = next;
   writeStore(store);
   return c.json({ conversation: next });
-});
+}
+conversations.put("/:id", patchHandler);
+conversations.patch("/:id", patchHandler);
 
 conversations.delete("/:id", (c) => {
   const store = readStore();
