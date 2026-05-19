@@ -29,6 +29,45 @@ export type CliResult = {
 };
 
 export async function runHermesCli(args: string[]): Promise<CliResult> {
+  return runInHermes([HERMES_BIN, ...args]);
+}
+
+/**
+ * Read a Hermes-data file from /opt/data via 'cat'. Returns the file
+ * contents as utf-8; returns '' (and ok:false) if the path does not
+ * exist or any other error.
+ *
+ * Scope: only paths under /opt/data are allowed — we ban '..' and
+ * absolute escapes here at the API boundary.
+ */
+export async function readHermesDataFile(relPath: string): Promise<CliResult> {
+  if (relPath.includes("..") || relPath.startsWith("/")) {
+    throw new Error("readHermesDataFile: relPath must be relative under /opt/data");
+  }
+  return runInHermes(["cat", `/opt/data/${relPath}`]);
+}
+
+/**
+ * Write a Hermes-data file under /opt/data. The body is base64-encoded
+ * client-side and sh-decoded on the container side — avoids fighting
+ * docker exec's stdin-attach hijack flow over plain fetch.
+ */
+export async function writeHermesDataFile(
+  relPath: string,
+  body: string,
+): Promise<CliResult> {
+  if (relPath.includes("..") || relPath.startsWith("/")) {
+    throw new Error("writeHermesDataFile: relPath must be relative under /opt/data");
+  }
+  const b64 = Buffer.from(body, "utf8").toString("base64");
+  return runInHermes([
+    "sh",
+    "-c",
+    `printf '%s' '${b64}' | base64 -d > /opt/data/${relPath}`,
+  ]);
+}
+
+async function runInHermes(cmd: string[]): Promise<CliResult> {
   const t0 = Date.now();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), EXEC_TIMEOUT_MS);
@@ -43,7 +82,7 @@ export async function runHermesCli(args: string[]): Promise<CliResult> {
           AttachStdout: true,
           AttachStderr: true,
           Tty: true,
-          Cmd: [HERMES_BIN, ...args],
+          Cmd: cmd,
         }),
         signal: ctrl.signal,
       },
