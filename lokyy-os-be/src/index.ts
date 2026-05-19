@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import type { MiddlewareHandler } from "hono";
 import { auth } from "./auth.ts";
 import { lokyyStubs } from "./api/lokyy-stubs.ts";
+import { jobs } from "./api/jobs.ts";
 import { hermesStubs } from "./api/hermes-stubs.ts";
 import { conversations } from "./api/conversations.ts";
 import { activity } from "./api/activity.ts";
@@ -143,6 +144,10 @@ app.route("/api/lokyy/workflows", workflowsApp);
 // Tasks (Kanban) — proxied to hermes-dashboard /api/plugins/kanban.
 // Mounted BEFORE the generic /api/lokyy stub-router so it wins for /tasks.
 app.route("/api/lokyy/tasks", tasks);
+
+// Jobs — sqlite-backed CRUD (Issue #135). Wins over the /jobs stub in
+// lokyy-stubs.ts for the same reason as /tasks.
+app.route("/api/lokyy/jobs", jobs);
 
 // Phase-1d stub endpoints — sidebar routes call these on mount.
 // Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).

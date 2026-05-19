@@ -102,17 +102,8 @@ lokyyStubs.post("/agents/:agentId/mcps/:mcpId/toggle", (c) =>
 // hermes-dashboard /api/plugins/kanban/board. The Phase-1d "Hermes-Kanban
 // nicht initialisiert" stub was a bug — see Issue #113.
 
-lokyyStubs.get("/jobs", (c) =>
-  c.json({ jobs: [] })
-);
-
-lokyyStubs.post("/jobs", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  return c.json({
-    job: { id: crypto.randomUUID(), status: "queued", ...body },
-    note: "stub — job not actually scheduled until Phase-2",
-  }, 202);
-});
+// NOTE: /jobs moved to a dedicated router (src/api/jobs.ts) with
+// sqlite-backed CRUD — Issue #135. The Phase-1d echo-stub here is gone.
 
 // Wired to hermes-dashboard /api/sessions
 lokyyStubs.get("/sessions", async (c) => {
