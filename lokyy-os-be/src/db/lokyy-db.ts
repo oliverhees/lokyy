@@ -52,6 +52,20 @@ lokyyDb.exec(`
     createdAt       INTEGER NOT NULL,
     updatedAt       INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS lokyy_reminder (
+    id            TEXT    PRIMARY KEY,
+    text          TEXT    NOT NULL,
+    scheduledAt   INTEGER NOT NULL,         -- ms epoch
+    channel       TEXT    NOT NULL DEFAULT 'in-app',  -- in-app | telegram | email | calendar
+    status        TEXT    NOT NULL DEFAULT 'pending', -- pending | fired | dismissed | failed
+    createdAt     INTEGER NOT NULL,
+    firedAt       INTEGER,
+    deliveryError TEXT,
+    origin        TEXT    NOT NULL DEFAULT 'user'    -- user (UI) | agent (Hermes-skill)
+  );
+  CREATE INDEX IF NOT EXISTS idx_lokyy_reminder_status_scheduled
+    ON lokyy_reminder(status, scheduledAt);
 `);
 
 export type LokyyJobRow = {
@@ -83,4 +97,20 @@ export type LokyyTeamRow = {
   memberAgentIds: string;
   createdAt: number;
   updatedAt: number;
+};
+
+export type ReminderChannel = "in-app" | "telegram" | "email" | "calendar";
+export type ReminderStatus = "pending" | "fired" | "dismissed" | "failed";
+export type ReminderOrigin = "user" | "agent";
+
+export type LokyyReminderRow = {
+  id: string;
+  text: string;
+  scheduledAt: number;
+  channel: ReminderChannel;
+  status: ReminderStatus;
+  createdAt: number;
+  firedAt: number | null;
+  deliveryError: string | null;
+  origin: ReminderOrigin;
 };

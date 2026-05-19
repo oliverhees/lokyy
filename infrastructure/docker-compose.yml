@@ -257,6 +257,9 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # System-bearer für agent-skill HTTP-calls zu lokyy-os-be
+      # (z.B. lokyy-reminders Skill via curl). Issue #154.
+      - LOKYY_SYSTEM_SECRET=${LOKYY_SYSTEM_SECRET}
     volumes:
       - lokyy-hermes-data:/opt/data
     healthcheck:
