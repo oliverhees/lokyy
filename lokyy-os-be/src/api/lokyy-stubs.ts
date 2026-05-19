@@ -304,8 +304,11 @@ lokyyStubs.get("/vault", (c) => {
 // render cleanly instead of error-cards.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HERMES_NOT_RUNNING_RAW =
-  "[lokyy] Hermes Agent is not deployed yet. This panel goes live in Phase-2 of the Lokyy roadmap.";
+// Used by routes that proxy hermes-dashboard JSON endpoints as the
+// raw-string fallback when the dashboard is unreachable. The old text
+// claimed Hermes wasn't deployed (Phase-1d), which is no longer true.
+const HERMES_BRIDGE_UNREACHABLE_RAW =
+  "[lokyy] hermes-dashboard nicht erreichbar — die Bridge antwortet nicht. Containers prüfen: lokyy-hermes + lokyy-hermes-dashboard.";
 
 // Real backing — `hermes memory status` exec'd via docker-socket-proxy.
 // CLI prints "Provider:  <name>" or "Provider: (none — built-in only)"
@@ -453,7 +456,7 @@ lokyyStubs.get("/hermes-plugins", async (c) => {
   }));
   return c.json({
     plugins,
-    raw: r.live ? `[lokyy] ${skills.length} skills loaded from Hermes` : HERMES_NOT_RUNNING_RAW,
+    raw: r.live ? `[lokyy] ${skills.length} skills loaded from Hermes` : HERMES_BRIDGE_UNREACHABLE_RAW,
   });
 });
 
@@ -546,7 +549,7 @@ lokyyStubs.get("/hermes-insights", async (c) => {
   const r = await safeDash<{ sessions?: HermesSession[] }>("/api/sessions", { sessions: [] });
   if (!r.live) {
     return c.json({
-      raw: r.error ?? HERMES_NOT_RUNNING_RAW,
+      raw: r.error ?? HERMES_BRIDGE_UNREACHABLE_RAW,
       summary: { sessions: 0, messages: 0, toolCalls: 0, totalTokens: 0, activeTime: "0m" },
     });
   }
@@ -587,26 +590,65 @@ lokyyStubs.get("/hermes-insights", async (c) => {
 lokyyStubs.get("/hermes-logs", async (c) => {
   const r = await safeDash<{ file?: string; lines?: string[] }>("/api/logs", { lines: [] });
   if (!r.live) {
-    return c.json({ raw: HERMES_NOT_RUNNING_RAW, ok: false, error: r.error ?? "unknown" });
+    return c.json({ raw: HERMES_BRIDGE_UNREACHABLE_RAW, ok: false, error: r.error ?? "unknown" });
   }
   return c.json({ raw: (r.data.lines ?? []).join(""), ok: true, error: "" });
 });
 
-lokyyStubs.get("/hermes-curator", (c) =>
-  c.json({
-    enabled: false,
-    runs: 0,
-    lastRun: "",
-    lastSummary: "",
-    interval: "",
-    raw: HERMES_NOT_RUNNING_RAW,
-  })
-);
+// Curator + Doctor are user-triggered buttons in /settings — both run
+// the corresponding read-only hermes CLI subcommand via docker-exec
+// and surface the raw output. The FE only needs `raw` (Doctor) plus
+// `enabled` + summary fields (Curator); we infer those from the text.
+lokyyStubs.get("/hermes-curator", async (c) => {
+  try {
+    const r = await runHermesCli(["curator", "status"]);
+    const cleaned = r.stdout.replace(ANSI_RE, "");
+    // Heuristic: text says "running" / "paused" / "not yet run" — we
+    // surface enabled = true when the curator is not paused/disabled.
+    const enabled = !/paused|disabled|not configured/i.test(cleaned);
+    return c.json({
+      enabled,
+      runs: 0,
+      lastRun: "",
+      lastSummary: "",
+      interval: "",
+      raw: r.ok ? cleaned.trim() : `[lokyy] curator status exit=${r.exitCode}\n${cleaned}`,
+    });
+  } catch (err) {
+    return c.json({
+      enabled: false,
+      runs: 0,
+      lastRun: "",
+      lastSummary: "",
+      interval: "",
+      raw: `[lokyy] curator-status exec failed: ${(err as Error).message}`,
+    });
+  }
+});
 
-lokyyStubs.get("/hermes-doctor", (c) =>
-  c.json({ raw: HERMES_NOT_RUNNING_RAW, ok: false })
-);
+lokyyStubs.get("/hermes-doctor", async (c) => {
+  try {
+    const r = await runHermesCli(["doctor"]);
+    const cleaned = r.stdout.replace(ANSI_RE, "");
+    return c.json({ raw: cleaned.trim(), ok: r.ok });
+  } catch (err) {
+    return c.json({
+      raw: `[lokyy] doctor exec failed: ${(err as Error).message}`,
+      ok: false,
+    });
+  }
+});
 
+// Backup is state-changing (creates a zip on the host) and can take
+// 5-60s — too risky to fire from a click without confirmation +
+// progress UI. We surface an honest "not yet wired" message instead
+// of pretending the click did something. Follow-up issue tracks the
+// real backup flow.
 lokyyStubs.get("/hermes-backup", (c) =>
-  c.json({ ok: false, output: HERMES_NOT_RUNNING_RAW, path: null })
+  c.json({
+    ok: false,
+    output:
+      "[lokyy] Backup-Flow ist noch nicht verdrahtet. `hermes backup` ist state-changing und braucht Confirmation + Progress-UI. Bis dahin manuell im Container ausführen: docker exec lokyy-hermes /opt/hermes/.venv/bin/hermes backup",
+    path: null,
+  })
 );
