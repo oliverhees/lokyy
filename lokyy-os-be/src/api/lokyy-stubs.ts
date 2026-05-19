@@ -139,9 +139,107 @@ lokyyStubs.get("/workflows", (c) =>
   c.json({ workflows: [] })
 );
 
+// Integrations = OAuth-backed third-party providers (calendar, email,
+// docs, dev, CRM, comms). The FE already has icons + categories for 6
+// well-known providers; we surface those as the curated list.
+//
+// connect/disconnect remain unimplemented — OAuth flows are tracked
+// under the Phase-6 producer-wiring milestone. Until then the POST
+// endpoints below return 501 with a deterministic note so the UI can
+// show a clear "not yet supported" message instead of a silent fail.
+type IntegrationProvider = {
+  id: string;
+  name: string;
+  description: string;
+  category: "calendar" | "email" | "crm" | "docs" | "comms" | "dev";
+  homepage: string;
+  status: "connected" | "disconnected";
+  connectedAt?: string;
+};
+const SUPPORTED_INTEGRATIONS: IntegrationProvider[] = [
+  {
+    id: "google-calendar",
+    name: "Google Calendar",
+    description: "Lokyy liest und plant Events in deinem Google Kalender.",
+    category: "calendar",
+    homepage: "https://calendar.google.com",
+    status: "disconnected",
+  },
+  {
+    id: "gmail",
+    name: "Gmail",
+    description: "Lese und sende E-Mails per Lokyy-Agent via Gmail API.",
+    category: "email",
+    homepage: "https://mail.google.com",
+    status: "disconnected",
+  },
+  {
+    id: "notion",
+    name: "Notion",
+    description: "Workspace-Seiten lesen, schreiben und durchsuchen.",
+    category: "docs",
+    homepage: "https://notion.so",
+    status: "disconnected",
+  },
+  {
+    id: "linear",
+    name: "Linear",
+    description: "Issues anlegen, kommentieren und Status ändern.",
+    category: "crm",
+    homepage: "https://linear.app",
+    status: "disconnected",
+  },
+  {
+    id: "slack",
+    name: "Slack",
+    description: "Lokyy-Agent postet in Channels und beantwortet DMs.",
+    category: "comms",
+    homepage: "https://slack.com",
+    status: "disconnected",
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    description: "Repos, Issues und PRs lesen + bearbeiten.",
+    category: "dev",
+    homepage: "https://github.com",
+    status: "disconnected",
+  },
+];
+
 lokyyStubs.get("/integrations", (c) =>
-  c.json({ integrations: [], available: [] })
+  c.json({ integrations: SUPPORTED_INTEGRATIONS, available: [] })
 );
+
+// connect / disconnect — placeholder until Phase-6 OAuth wiring lands.
+// Returning a 501 (with a body the FE can read) is intentional so the
+// button surfaces a real "not yet supported" toast instead of a fake
+// success that would leave the user expecting an OAuth popup.
+lokyyStubs.post("/integrations/:id/connect", (c) => {
+  const id = c.req.param("id");
+  return c.json(
+    {
+      error: "not_implemented",
+      provider: id,
+      message:
+        "OAuth-Flow für diesen Provider ist noch nicht verdrahtet. Phase-6 (Producer-Wiring) bringt echtes Connect/Disconnect.",
+    },
+    501,
+  );
+});
+
+lokyyStubs.post("/integrations/:id/disconnect", (c) => {
+  const id = c.req.param("id");
+  return c.json(
+    {
+      error: "not_implemented",
+      provider: id,
+      message:
+        "Disconnect-Flow ist mit Connect gekoppelt und landet zusammen in Phase-6.",
+    },
+    501,
+  );
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settings
