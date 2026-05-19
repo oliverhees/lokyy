@@ -34,6 +34,15 @@ lokyyDb.exec(`
     nextRun     INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_lokyy_job_status ON lokyy_job(status);
+
+  CREATE TABLE IF NOT EXISTS lokyy_prompt (
+    id          TEXT    PRIMARY KEY,
+    title       TEXT    NOT NULL,
+    body        TEXT    NOT NULL,
+    tags        TEXT    NOT NULL DEFAULT '[]',
+    createdAt   INTEGER NOT NULL,
+    updatedAt   INTEGER NOT NULL
+  );
 `);
 
 export type LokyyJobRow = {
@@ -45,4 +54,14 @@ export type LokyyJobRow = {
   createdAt: number;
   lastRun: number | null;
   nextRun: number | null;
+};
+
+export type LokyyPromptRow = {
+  id: string;
+  title: string;
+  body: string;
+  /** JSON-encoded string[] in storage; deserialized at the API boundary. */
+  tags: string;
+  createdAt: number;
+  updatedAt: number;
 };
