@@ -14,7 +14,7 @@
  * Manual-fire (POST /jobs/:id/run) ruft fireJob() direkt auf, ohne durch
  * den Tick zu müssen.
  */
-import { lokyyDb, type LokyyJobRow } from "../db/lokyy-db.ts";
+import { lokyyDb, type LokyyJobRow, type LokyyReminderRow } from "../db/lokyy-db.ts";
 import { cronMatches, isPlausibleCron } from "./cron-match.ts";
 
 const TICK_MS = Number.parseInt(process.env.SCHEDULER_TICK_MS ?? "60000", 10);
@@ -95,6 +95,37 @@ function loadActiveJobs(): LokyyJobRow[] {
     .all();
 }
 
+async function fireReminder(rem: LokyyReminderRow): Promise<void> {
+  const now = Date.now();
+  // For now ALL channels flip to 'fired' synchronously; the FE dashboard
+  // polls /pending-deliveries to show in-app toasts. External delivery
+  // (telegram/email/calendar) is wired in Iteration B (separate story);
+  // for those we mark fired but log a 'delivery deferred' note so the
+  // user knows the reminder triggered even though no external bot was
+  // available yet.
+  let deliveryError: string | null = null;
+  if (rem.channel !== "in-app") {
+    deliveryError =
+      "external delivery channel not wired yet — falling back to in-app";
+  }
+  lokyyDb
+    .query(
+      "UPDATE lokyy_reminder SET status = 'fired', firedAt = ?, deliveryError = ? WHERE id = ?",
+    )
+    .run(now, deliveryError, rem.id);
+  console.log(
+    `[scheduler] reminder fired ${rem.id} channel=${rem.channel} text="${rem.text.slice(0, 60)}"`,
+  );
+}
+
+function loadDueReminders(nowMs: number): LokyyReminderRow[] {
+  return lokyyDb
+    .query<LokyyReminderRow, [number]>(
+      "SELECT * FROM lokyy_reminder WHERE status = 'pending' AND scheduledAt <= ?",
+    )
+    .all(nowMs);
+}
+
 async function tick(): Promise<void> {
   const now = new Date();
   const nowMs = Date.now();
@@ -105,6 +136,9 @@ async function tick(): Promise<void> {
     const last = recentFires.get(job.id) ?? 0;
     if (nowMs - last < DEDUP_MS) continue;
     await fireJob(job);
+  }
+  for (const rem of loadDueReminders(nowMs)) {
+    await fireReminder(rem);
   }
 }
 
