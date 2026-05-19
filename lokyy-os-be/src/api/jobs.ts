@@ -21,6 +21,8 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { auth } from "../auth.ts";
 import { lokyyDb, type LokyyJobRow } from "../db/lokyy-db.ts";
+import { normalizeSchedule } from "../scheduler/cron-match.ts";
+import { fireJob, getJobById } from "../scheduler/job-runner.ts";
 
 const requireAuth: MiddlewareHandler = async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -71,22 +73,27 @@ jobs.post("/", async (c) => {
     prompt?: unknown;
   };
 
-  const schedule = typeof body.schedule === "string" ? body.schedule.trim() : "";
+  const rawSchedule = typeof body.schedule === "string" ? body.schedule.trim() : "";
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   const name =
     typeof body.name === "string" && body.name.trim().length > 0
       ? body.name.trim()
       : prompt.slice(0, 40) || "Unbenannter Job";
 
-  if (!schedule) return c.json({ ok: false, error: "schedule is required" }, 400);
+  if (!rawSchedule) return c.json({ ok: false, error: "schedule is required" }, 400);
   if (!prompt) return c.json({ ok: false, error: "prompt is required" }, 400);
+  // FE-shortcuts (e.g. '30m', '1h') get rewritten to 5-field cron here
+  // so the cron-matcher only ever sees its native dialect.
+  const schedule = normalizeSchedule(rawSchedule);
 
   const id = `job_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
   const now = Date.now();
+  // status defaults to 'active' now that the cron-runner is wired —
+  // a freshly-created job runs on its schedule until the user pauses it.
   lokyyDb
     .query(
       `INSERT INTO lokyy_job (id, name, schedule, prompt, status, createdAt, lastRun, nextRun)
-       VALUES (?, ?, ?, ?, 'paused', ?, NULL, NULL)`,
+       VALUES (?, ?, ?, ?, 'active', ?, NULL, NULL)`,
     )
     .run(id, name, schedule, prompt, now);
 
@@ -101,6 +108,47 @@ jobs.post("/", async (c) => {
   return c.json({ ok: true, job: rowToJob(row) }, 201);
 });
 
+jobs.patch("/:id", async (c) => {
+  const id = c.req.param("id");
+  const existing = getJobById(id);
+  if (!existing) return c.json({ ok: false, error: "not found" }, 404);
+
+  const patch = (await c.req.json().catch(() => ({}))) as {
+    name?: unknown;
+    schedule?: unknown;
+    prompt?: unknown;
+    status?: unknown;
+  };
+  const nextName =
+    typeof patch.name === "string" && patch.name.trim().length > 0
+      ? patch.name.trim()
+      : existing.name;
+  const nextSchedule =
+    typeof patch.schedule === "string" && patch.schedule.trim().length > 0
+      ? normalizeSchedule(patch.schedule.trim())
+      : existing.schedule;
+  const nextPrompt =
+    typeof patch.prompt === "string" && patch.prompt.trim().length > 0
+      ? patch.prompt.trim()
+      : existing.prompt;
+  // Only 'active' and 'paused' are user-settable; anything else falls
+  // back to the current value (we don't want a PATCH to drive a job
+  // into an unknown state).
+  const nextStatus =
+    patch.status === "active" || patch.status === "paused"
+      ? patch.status
+      : existing.status;
+
+  lokyyDb
+    .query(
+      `UPDATE lokyy_job SET name = ?, schedule = ?, prompt = ?, status = ? WHERE id = ?`,
+    )
+    .run(nextName, nextSchedule, nextPrompt, nextStatus, id);
+
+  const row = getJobById(id);
+  return c.json({ ok: true, job: rowToJob(row!) });
+});
+
 jobs.delete("/:id", (c) => {
   const id = c.req.param("id");
   const result = lokyyDb.query("DELETE FROM lokyy_job WHERE id = ?").run(id);
@@ -110,4 +158,15 @@ jobs.delete("/:id", (c) => {
     return c.json({ ok: false, error: "not found" }, 404);
   }
   return c.json({ ok: true });
+});
+
+// Manual-fire — bypasses the cron-matcher and fires the job NOW.
+// Useful for the FE 'Run now' button (future) and for E2E tests that
+// don't want to wait for the next tick.
+jobs.post("/:id/run", async (c) => {
+  const id = c.req.param("id");
+  const job = getJobById(id);
+  if (!job) return c.json({ ok: false, error: "not found" }, 404);
+  const result = await fireJob(job);
+  return c.json({ ok: result.ok, ...result, job: rowToJob(getJobById(id)!) });
 });
