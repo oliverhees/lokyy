@@ -1,16 +1,5 @@
 # NOTICE
 
-## Hermes Workspace
-
-This product includes software from the Hermes Workspace project.
-
-Copyright (c) [original authors — see LICENSE file]
-Licensed under the MIT License (see LICENSE file in this repository).
-
-Source: https://github.com/outsourc-e/hermes-workspace
-
----
-
 ## Lokyy
 
 Lokyy — portions written by the Lokyy authors.
@@ -18,7 +7,7 @@ Lokyy — portions written by the Lokyy authors.
 Copyright (c) 2026 Oliver Hees and Lokyy contributors.
 
 Licensed under the GNU Affero General Public License, version 3 or later
-(AGPL-3.0-or-later). See LICENSE for the full text. The AGPL Section 13
+(AGPL-3.0-or-later). See `LICENSE` for the full text. The AGPL Section 13
 network-use clause applies: anyone modifying Lokyy and offering it as a
 network service must make their modified source available to users of that
 service, under the same license.
@@ -27,4 +16,20 @@ service, under the same license.
 
 ## Third-Party Components
 
-See docs/licensing-todo.md for the full license inventory of all stack components.
+Lokyy bundles or links against several third-party components. All of them
+ship under licenses compatible with AGPL-3.0:
+
+| Component | License | Project |
+|-----------|---------|---------|
+| Hermes Agent | MIT | https://github.com/NousResearch/hermes-agent |
+| Hermes Workspace | MIT | https://github.com/outsourc-e/hermes-workspace |
+| Traefik | MIT | https://github.com/traefik/traefik |
+| Better-Auth | MIT | https://better-auth.com |
+| TanStack Router | MIT | https://tanstack.com/router |
+| Hono | MIT | https://hono.dev |
+| Bun runtime | MIT | https://bun.sh |
+| nginx (FE serving) | BSD-2-Clause | https://nginx.org |
+| tecnativa/docker-socket-proxy | Apache-2.0 | https://github.com/Tecnativa/docker-socket-proxy |
+
+Each component retains its own copyright. See the upstream `LICENSE` file
+in the linked project for full terms.
