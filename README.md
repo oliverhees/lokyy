@@ -2,7 +2,7 @@
 
 > **Dein eigenes KI-Betriebssystem auf deinem eigenen Server.** Tasks, Agents, Workflows, Tools, Memory — alles unter deiner Kontrolle, alle Daten bei dir.
 
-![status](https://img.shields.io/badge/status-personal--beta-blueviolet) ![license](https://img.shields.io/badge/license-MIT-green)
+![status](https://img.shields.io/badge/status-personal--beta-blueviolet) ![license](https://img.shields.io/badge/license-TBD-lightgrey)
 
 Lokyy ist ein selbst-gehostetes KI-Betriebssystem, gebaut auf [Hermes Agent](https://github.com/nousresearch/hermes-agent). Du bekommst:
 
@@ -268,7 +268,9 @@ Volle Architektur-Doku unter `docs/decisions/ADR-003-docker-topology-etappe-2.md
 
 ## Lizenz
 
-MIT — siehe [`LICENSE`](LICENSE). Lokyy basiert auf [Hermes Agent](https://github.com/nousresearch/hermes-agent) (ebenfalls MIT). Attribution siehe [`NOTICE`](NOTICE).
+**Lokyy: Lizenz-Entscheidung steht noch aus** (siehe [`docs/questions.md`](docs/questions.md) und [`docs/licensing-todo.md`](docs/licensing-todo.md)). Bis eine Lizenz festgelegt ist gilt: Self-Install zur persönlichen Nutzung ist erlaubt, Weiterverteilung oder kommerzielle Nutzung bitte erst nach Absprache.
+
+Upstream-Komponenten: [Hermes Agent](https://github.com/nousresearch/hermes-agent) (MIT), [Hermes Workspace](https://github.com/outsourc-e/hermes-workspace) (MIT), Traefik (MIT), [Better-Auth](https://better-auth.com) (MIT). Vollständige Lizenz-Inventur unter [`docs/licensing-todo.md`](docs/licensing-todo.md). Attribution unter [`NOTICE`](NOTICE).
 
 ---
 
