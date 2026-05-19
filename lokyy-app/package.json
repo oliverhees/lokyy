@@ -6,7 +6,7 @@
   "description": "Lokyy Personal — Greenfield-Frontend gegen Hermes-Gateway (Etappe 2, see ADR-001).",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build && tsc -b --noEmit",
     "preview": "vite preview --port 3100",
     "typecheck": "tsc -b --noEmit",
     "test:e2e": "playwright test",
