@@ -43,6 +43,15 @@ lokyyDb.exec(`
     createdAt   INTEGER NOT NULL,
     updatedAt   INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS lokyy_team (
+    id              TEXT    PRIMARY KEY,
+    name            TEXT    NOT NULL,
+    description     TEXT    NOT NULL DEFAULT '',
+    memberAgentIds  TEXT    NOT NULL DEFAULT '[]',
+    createdAt       INTEGER NOT NULL,
+    updatedAt       INTEGER NOT NULL
+  );
 `);
 
 export type LokyyJobRow = {
@@ -62,6 +71,16 @@ export type LokyyPromptRow = {
   body: string;
   /** JSON-encoded string[] in storage; deserialized at the API boundary. */
   tags: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type LokyyTeamRow = {
+  id: string;
+  name: string;
+  description: string;
+  /** JSON-encoded string[] of agent ids; deserialized at the API boundary. */
+  memberAgentIds: string;
   createdAt: number;
   updatedAt: number;
 };

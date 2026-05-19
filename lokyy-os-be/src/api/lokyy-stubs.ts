@@ -121,9 +121,8 @@ lokyyStubs.get("/sessions", async (c) => {
 // NOTE: /prompts moved to a dedicated router (src/api/prompts.ts)
 // with sqlite-backed CRUD — Issue #137.
 
-lokyyStubs.get("/teams", (c) =>
-  c.json({ teams: [] })
-);
+// NOTE: /teams moved to a dedicated router (src/api/teams.ts) with
+// sqlite-backed CRUD — Issue #139.
 
 lokyyStubs.get("/workflows", (c) =>
   c.json({ workflows: [] })
