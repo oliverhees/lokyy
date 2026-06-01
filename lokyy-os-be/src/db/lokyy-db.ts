@@ -35,6 +35,7 @@ lokyyDb.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_lokyy_job_status ON lokyy_job(status);
 
+
   CREATE TABLE IF NOT EXISTS lokyy_prompt (
     id          TEXT    PRIMARY KEY,
     title       TEXT    NOT NULL,
@@ -66,7 +67,72 @@ lokyyDb.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_lokyy_reminder_status_scheduled
     ON lokyy_reminder(status, scheduledAt);
+
+  -- Second Brain — Phase-3 (B1 foundation).
+  -- Singleton row: id is always 'default' for v1, leaves room for multi-vault later.
+  CREATE TABLE IF NOT EXISTS lokyy_vault (
+    id            TEXT    PRIMARY KEY DEFAULT 'default',
+    mode          TEXT    NOT NULL,                -- 'local' | 'remote'
+    remoteUrl     TEXT,                            -- null when mode='local'
+    sshKeyId      TEXT,                            -- FK to lokyy_ssh_key.id
+    lastSyncAt    INTEGER,
+    syncError     TEXT,
+    createdAt     INTEGER NOT NULL,
+    updatedAt     INTEGER NOT NULL
+  );
+
+  -- One row per generated keypair. Private key is encrypted at rest (AES-256-GCM
+  -- with key derived from BETTER_AUTH_SECRET — same trust boundary as session tokens).
+  CREATE TABLE IF NOT EXISTS lokyy_ssh_key (
+    id              TEXT    PRIMARY KEY,
+    keyType         TEXT    NOT NULL DEFAULT 'ed25519',
+    publicKey       TEXT    NOT NULL,
+    encPrivateKey   TEXT    NOT NULL,   -- base64(iv) ':' base64(ciphertext+tag)
+    createdAt       INTEGER NOT NULL
+  );
 `);
+
+/**
+ * Idempotent column migrations for lokyy_job — Brain-Andockung (Epic Cron-AP1, C2).
+ *
+ * SQLite has no `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, so we read the live
+ * column set via PRAGMA table_info and ADD only the columns that are missing.
+ * Safe to run on every boot (existing DBs get upgraded once, new DBs already
+ * have nothing to add after the first run).
+ */
+function ensureColumn(
+  table: string,
+  column: string,
+  ddl: string,
+): void {
+  const cols = lokyyDb
+    .query<{ name: string }, []>(`PRAGMA table_info(${table})`)
+    .all()
+    .map((r) => r.name);
+  if (!cols.includes(column)) {
+    lokyyDb.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
+}
+
+ensureColumn("lokyy_job", "brainEnabled", "brainEnabled INTEGER NOT NULL DEFAULT 0");
+ensureColumn("lokyy_job", "brainType", "brainType TEXT");
+ensureColumn("lokyy_job", "brainFolderHint", "brainFolderHint TEXT");
+
+/** Closed list of Brain DOC types accepted for a job's `brainType`. */
+export const BRAIN_DOC_TYPES = [
+  "note",
+  "capture",
+  "project",
+  "task",
+  "decision",
+  "meeting",
+  "customer",
+  "workflow",
+  "intervention",
+  "content",
+  "skill",
+] as const;
+export type BrainDocType = (typeof BRAIN_DOC_TYPES)[number];
 
 export type LokyyJobRow = {
   id: string;
@@ -77,6 +143,12 @@ export type LokyyJobRow = {
   createdAt: number;
   lastRun: number | null;
   nextRun: number | null;
+  /** 0/1 — whether a successful run writes its output into Brain. */
+  brainEnabled: number;
+  /** Brain DOC type; required (non-null) when brainEnabled = 1. */
+  brainType: BrainDocType | null;
+  /** Optional folder hint passed to Brain on write. */
+  brainFolderHint: string | null;
 };
 
 export type LokyyPromptRow = {
@@ -113,4 +185,25 @@ export type LokyyReminderRow = {
   firedAt: number | null;
   deliveryError: string | null;
   origin: ReminderOrigin;
+};
+
+export type VaultMode = "local" | "remote";
+
+export type LokyyVaultRow = {
+  id: string;
+  mode: VaultMode;
+  remoteUrl: string | null;
+  sshKeyId: string | null;
+  lastSyncAt: number | null;
+  syncError: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type LokyySshKeyRow = {
+  id: string;
+  keyType: "ed25519";
+  publicKey: string;
+  encPrivateKey: string;
+  createdAt: number;
 };

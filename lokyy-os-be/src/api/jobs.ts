@@ -20,9 +20,66 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { auth } from "../auth.ts";
-import { lokyyDb, type LokyyJobRow } from "../db/lokyy-db.ts";
+import {
+  BRAIN_DOC_TYPES,
+  lokyyDb,
+  type BrainDocType,
+  type LokyyJobRow,
+} from "../db/lokyy-db.ts";
 import { normalizeSchedule } from "../scheduler/cron-match.ts";
 import { fireJob, getJobById } from "../scheduler/job-runner.ts";
+
+const SELECT_JOB_COLS =
+  "id, name, schedule, prompt, status, createdAt, lastRun, nextRun, brainEnabled, brainType, brainFolderHint";
+
+function isBrainType(v: unknown): v is BrainDocType {
+  return typeof v === "string" && (BRAIN_DOC_TYPES as readonly string[]).includes(v);
+}
+
+/**
+ * Normalize + validate the optional Brain fields from a request body.
+ * Returns either the resolved triple or a validation error string.
+ *
+ * Rules (fixed contract):
+ *   - brainType, when present, must be one of BRAIN_DOC_TYPES.
+ *   - when brainEnabled = 1, brainType MUST be set.
+ */
+function resolveBrainFields(
+  body: { brainEnabled?: unknown; brainType?: unknown; brainFolderHint?: unknown },
+  current: { brainEnabled: number; brainType: BrainDocType | null; brainFolderHint: string | null },
+): { error: string } | { brainEnabled: number; brainType: BrainDocType | null; brainFolderHint: string | null } {
+  const brainEnabled =
+    body.brainEnabled === undefined
+      ? current.brainEnabled
+      : body.brainEnabled === true || body.brainEnabled === 1
+        ? 1
+        : 0;
+
+  let brainType: BrainDocType | null = current.brainType;
+  if (body.brainType !== undefined) {
+    if (body.brainType === null || body.brainType === "") {
+      brainType = null;
+    } else if (isBrainType(body.brainType)) {
+      brainType = body.brainType;
+    } else {
+      return { error: "brainType must be one of: " + BRAIN_DOC_TYPES.join(", ") };
+    }
+  }
+
+  let brainFolderHint: string | null = current.brainFolderHint;
+  if (body.brainFolderHint !== undefined) {
+    brainFolderHint =
+      typeof body.brainFolderHint === "string" && body.brainFolderHint.trim().length > 0
+        ? body.brainFolderHint.trim()
+        : null;
+  }
+
+  if (brainEnabled === 1 && !brainType) {
+    return { error: "brainType is required when brainEnabled is set" };
+  }
+
+  return { brainEnabled, brainType, brainFolderHint };
+}
 
 const requireAuth: MiddlewareHandler = async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -43,6 +100,9 @@ type Job = {
   status: "active" | "paused" | "unknown";
   lastRun?: string;
   nextRun?: string;
+  brainEnabled: boolean;
+  brainType: BrainDocType | null;
+  brainFolderHint: string | null;
 };
 
 function rowToJob(r: LokyyJobRow): Job {
@@ -54,13 +114,16 @@ function rowToJob(r: LokyyJobRow): Job {
     status: r.status,
     lastRun: r.lastRun ? new Date(r.lastRun).toISOString() : undefined,
     nextRun: r.nextRun ? new Date(r.nextRun).toISOString() : undefined,
+    brainEnabled: r.brainEnabled === 1,
+    brainType: r.brainType,
+    brainFolderHint: r.brainFolderHint,
   };
 }
 
 jobs.get("/", (c) => {
   const rows = lokyyDb
     .query<LokyyJobRow, []>(
-      "SELECT id, name, schedule, prompt, status, createdAt, lastRun, nextRun FROM lokyy_job ORDER BY createdAt DESC",
+      `SELECT ${SELECT_JOB_COLS} FROM lokyy_job ORDER BY createdAt DESC`,
     )
     .all();
   return c.json({ jobs: rows.map(rowToJob) });
@@ -71,6 +134,9 @@ jobs.post("/", async (c) => {
     name?: unknown;
     schedule?: unknown;
     prompt?: unknown;
+    brainEnabled?: unknown;
+    brainType?: unknown;
+    brainFolderHint?: unknown;
   };
 
   const rawSchedule = typeof body.schedule === "string" ? body.schedule.trim() : "";
@@ -82,6 +148,14 @@ jobs.post("/", async (c) => {
 
   if (!rawSchedule) return c.json({ ok: false, error: "schedule is required" }, 400);
   if (!prompt) return c.json({ ok: false, error: "prompt is required" }, 400);
+
+  const brain = resolveBrainFields(body, {
+    brainEnabled: 0,
+    brainType: null,
+    brainFolderHint: null,
+  });
+  if ("error" in brain) return c.json({ ok: false, error: brain.error }, 400);
+
   // FE-shortcuts (e.g. '30m', '1h') get rewritten to 5-field cron here
   // so the cron-matcher only ever sees its native dialect.
   const schedule = normalizeSchedule(rawSchedule);
@@ -92,14 +166,16 @@ jobs.post("/", async (c) => {
   // a freshly-created job runs on its schedule until the user pauses it.
   lokyyDb
     .query(
-      `INSERT INTO lokyy_job (id, name, schedule, prompt, status, createdAt, lastRun, nextRun)
-       VALUES (?, ?, ?, ?, 'active', ?, NULL, NULL)`,
+      `INSERT INTO lokyy_job
+         (id, name, schedule, prompt, status, createdAt, lastRun, nextRun,
+          brainEnabled, brainType, brainFolderHint)
+       VALUES (?, ?, ?, ?, 'active', ?, NULL, NULL, ?, ?, ?)`,
     )
-    .run(id, name, schedule, prompt, now);
+    .run(id, name, schedule, prompt, now, brain.brainEnabled, brain.brainType, brain.brainFolderHint);
 
   const row = lokyyDb
     .query<LokyyJobRow, [string]>(
-      "SELECT id, name, schedule, prompt, status, createdAt, lastRun, nextRun FROM lokyy_job WHERE id = ?",
+      `SELECT ${SELECT_JOB_COLS} FROM lokyy_job WHERE id = ?`,
     )
     .get(id);
   if (!row) {
@@ -118,6 +194,9 @@ jobs.patch("/:id", async (c) => {
     schedule?: unknown;
     prompt?: unknown;
     status?: unknown;
+    brainEnabled?: unknown;
+    brainType?: unknown;
+    brainFolderHint?: unknown;
   };
   const nextName =
     typeof patch.name === "string" && patch.name.trim().length > 0
@@ -139,11 +218,30 @@ jobs.patch("/:id", async (c) => {
       ? patch.status
       : existing.status;
 
+  const brain = resolveBrainFields(patch, {
+    brainEnabled: existing.brainEnabled,
+    brainType: existing.brainType,
+    brainFolderHint: existing.brainFolderHint,
+  });
+  if ("error" in brain) return c.json({ ok: false, error: brain.error }, 400);
+
   lokyyDb
     .query(
-      `UPDATE lokyy_job SET name = ?, schedule = ?, prompt = ?, status = ? WHERE id = ?`,
+      `UPDATE lokyy_job
+         SET name = ?, schedule = ?, prompt = ?, status = ?,
+             brainEnabled = ?, brainType = ?, brainFolderHint = ?
+       WHERE id = ?`,
     )
-    .run(nextName, nextSchedule, nextPrompt, nextStatus, id);
+    .run(
+      nextName,
+      nextSchedule,
+      nextPrompt,
+      nextStatus,
+      brain.brainEnabled,
+      brain.brainType,
+      brain.brainFolderHint,
+      id,
+    );
 
   const row = getJobById(id);
   return c.json({ ok: true, job: rowToJob(row!) });

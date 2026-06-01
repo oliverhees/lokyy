@@ -8,7 +8,10 @@ import { jobs } from "./api/jobs.ts";
 import { prompts } from "./api/prompts.ts";
 import { teams } from "./api/teams.ts";
 import { reminders } from "./api/reminders.ts";
+import { vaultSetup } from "./api/vault-setup.ts";
 import { startScheduler } from "./scheduler/job-runner.ts";
+import { startVaultSyncScheduler } from "./scheduler/vault-sync.ts";
+import { probeBrainHealth } from "./brain/brainAdapter.ts";
 import { hermesStubs } from "./api/hermes-stubs.ts";
 import { conversations } from "./api/conversations.ts";
 import { activity } from "./api/activity.ts";
@@ -165,6 +168,11 @@ app.route("/api/lokyy/teams", teams);
 // skill can call it without a user-cookie.
 app.route("/api/lokyy/reminders", reminders);
 
+// Second Brain — vault-setup router MUST be mounted before /api/lokyy catch-all
+// in lokyy-stubs so /api/lokyy/vault/setup/* doesn't get swallowed by the
+// /vault reader registered in lokyy-stubs.
+app.route("/api/lokyy/vault/setup", vaultSetup);
+
 // Phase-1d stub endpoints — sidebar routes call these on mount.
 // Real implementations land in Phase-2 (Hermes) / Phase-3 (brain).
 app.route("/api/lokyy", lokyyStubs);
@@ -180,6 +188,10 @@ console.log(`lokyy-os-be (Phase-1b) listening on :${port}`);
 // Start the in-process cron-scheduler for /jobs (Issue #141). Tick interval
 // is 60s by default; override via SCHEDULER_TICK_MS for tests.
 startScheduler();
+startVaultSyncScheduler();
+
+// One-shot Brain reachability probe (ISC-49). Logs status; never blocks start.
+void probeBrainHealth();
 
 export default {
   port,

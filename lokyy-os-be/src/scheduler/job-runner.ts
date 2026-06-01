@@ -16,6 +16,10 @@
  */
 import { lokyyDb, type LokyyJobRow, type LokyyReminderRow } from "../db/lokyy-db.ts";
 import { cronMatches, isPlausibleCron } from "./cron-match.ts";
+import { createManagedNote } from "../brain/brainAdapter.ts";
+
+const SELECT_JOB_COLS =
+  "id, name, schedule, prompt, status, createdAt, lastRun, nextRun, brainEnabled, brainType, brainFolderHint";
 
 const TICK_MS = Number.parseInt(process.env.SCHEDULER_TICK_MS ?? "60000", 10);
 const DEDUP_MS = Math.min(TICK_MS, 60_000) - 1_000;
@@ -77,6 +81,9 @@ export async function fireJob(job: LokyyJobRow): Promise<FireResult> {
     console.log(
       `[scheduler] fire ${job.id} "${job.name}" → ok (${Date.now() - t0}ms)`,
     );
+    // Best-effort Brain write. A failed/conflicting Brain write must NEVER
+    // flip the job result to failed — Hermes already succeeded.
+    await maybeWriteToBrain(job, content);
     return { ok: true, durationMs: Date.now() - t0, hermesContent: content };
   } catch (err) {
     return {
@@ -87,10 +94,48 @@ export async function fireJob(job: LokyyJobRow): Promise<FireResult> {
   }
 }
 
+/**
+ * Best-effort write of a job's Hermes output into Brain.
+ *
+ * Only runs when job.brainEnabled and a brainType is set. Wrapped in try/catch
+ * AND relying on the adapter never throwing — either way, a Brain failure or
+ * conflict is logged and swallowed so the job stays 'ok'.
+ */
+export async function maybeWriteToBrain(
+  job: LokyyJobRow,
+  hermesContent: string,
+): Promise<void> {
+  if (job.brainEnabled !== 1 || !job.brainType) return;
+  try {
+    const result = await createManagedNote({
+      title: `Job: ${job.name}`,
+      body: hermesContent,
+      type: job.brainType,
+      folderHint: job.brainFolderHint ?? undefined,
+      tags: ["scheduler", job.id],
+    });
+    if (result.ok) {
+      console.log(
+        `[scheduler] brain-write ${job.id} → ok id=${result.id} path=${result.path}`,
+      );
+    } else {
+      console.warn(
+        `[scheduler] brain-write ${job.id} → skipped/failed reason=${result.reason}`,
+      );
+    }
+  } catch (err) {
+    // Defensive: adapter is contracted not to throw, but never let a Brain
+    // write surface as a job failure.
+    console.warn(
+      `[scheduler] brain-write ${job.id} → unexpected throw: ${(err as Error).message}`,
+    );
+  }
+}
+
 function loadActiveJobs(): LokyyJobRow[] {
   return lokyyDb
     .query<LokyyJobRow, []>(
-      "SELECT id, name, schedule, prompt, status, createdAt, lastRun, nextRun FROM lokyy_job WHERE status = 'active'",
+      `SELECT ${SELECT_JOB_COLS} FROM lokyy_job WHERE status = 'active'`,
     )
     .all();
 }
@@ -157,7 +202,7 @@ export function getJobById(id: string): LokyyJobRow | null {
   return (
     lokyyDb
       .query<LokyyJobRow, [string]>(
-        "SELECT id, name, schedule, prompt, status, createdAt, lastRun, nextRun FROM lokyy_job WHERE id = ?",
+        `SELECT ${SELECT_JOB_COLS} FROM lokyy_job WHERE id = ?`,
       )
       .get(id) ?? null
   );
