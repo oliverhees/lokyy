@@ -280,13 +280,26 @@ lokyyStubs.post("/settings", async (c) => {
 import { readdir, readFile, realpath, stat } from "node:fs/promises";
 import { join, normalize, sep } from "node:path";
 
-const VAULT_ROOT_RAW = process.env.LOKYY_VAULT_PATH ?? "";
+// Phase-3 B1: vault config now lives in lokyy_vault table. When configured,
+// the reader uses /app/vault (the named-volume mount). Legacy LOKYY_VAULT_PATH
+// is honored as a fallback so existing setups don't break — first hit wins.
+import { getVaultRow, MANAGED_VAULT_PATH } from "../vault/runtime.ts";
+
+const VAULT_LEGACY_PATH = process.env.LOKYY_VAULT_PATH ?? "";
 const VAULT_READ_MAX_BYTES = 256 * 1024; // 256 KiB cap on file reads
 
 async function resolveVaultRoot(): Promise<string | null> {
-  if (!VAULT_ROOT_RAW) return null;
+  // Prefer the managed vault (DB-configured via /vault/setup).
+  if (getVaultRow()) {
+    try {
+      return await realpath(MANAGED_VAULT_PATH);
+    } catch {
+      return null;
+    }
+  }
+  if (!VAULT_LEGACY_PATH) return null;
   try {
-    return await realpath(VAULT_ROOT_RAW);
+    return await realpath(VAULT_LEGACY_PATH);
   } catch {
     return null;
   }

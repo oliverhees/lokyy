@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth-client'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/sidebar/app-sidebar'
 import { SiteHeader } from '@/components/layout/header'
+import { RemindersPoller } from '@/components/reminders-poller'
 
 export const Route = createFileRoute('/_authed')({
   beforeLoad: async () => {
@@ -36,6 +37,7 @@ function AuthedLayout() {
           </div>
         </div>
       </SidebarInset>
+      <RemindersPoller />
     </SidebarProvider>
   )
 }

@@ -23,8 +23,12 @@ volumes:
     name: lokyy-os-db
   lokyy-hermes-data:
     name: lokyy-hermes-data
+  # Phase-3 — Second Brain working copy (B1). Mounted into lokyy-os-be at
+  # /app/vault. The vault is a regular git working tree when mode='remote'.
+  lokyy-vault-data:
+    name: lokyy-vault-data
   # Reserved for future phases (uncomment when activating the phase):
-  # lokyy-brain-vault:    # Phase-3 — lokyy-brain Forgejo working copy
+  # lokyy-brain-vault:    # Phase-3 — lokyy-brain Forgejo working copy (legacy name)
   #   name: lokyy-brain-vault
   # lokyy-os-db:          # Phase-1 — Auth-DB + activity-log SQLite
   #   name: lokyy-os-db
@@ -158,11 +162,14 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - lokyy-os-db:/app/data
-      # Second-Brain: mount your Obsidian vault read-only and set
-      # LOKYY_VAULT_PATH below to the container-side path. The /vault
-      # route in lokyy-app reads files via fs.readdir/readFile inside
-      # this container; without the mount the route shows the
-      # "Kein Obsidian-Vault konfiguriert" empty-state.
+      # Second Brain (Phase-3 B1): managed vault — Lokyy initializes the dir
+      # on first /vault/setup. Mode='local' means just files, mode='remote'
+      # means it's a git working tree.
+      - lokyy-vault-data:/app/vault
+      # Legacy override: point at an EXISTING host vault (read-only). Setting
+      # LOKYY_VAULT_PATH below to /vault makes the /api/lokyy/vault reader
+      # use this path INSTEAD of /app/vault. New installs should use the
+      # /vault/setup wizard (which writes to /app/vault).
       # - ${LOKYY_VAULT_HOST_PATH:-/dev/null}:/vault:ro
     environment:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
